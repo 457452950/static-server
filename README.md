@@ -106,7 +106,7 @@ To build image yourself, please change the PWD to the root of this repo.
 
 ```bash
 $ cd gohttpserver/
-$ docker build -t codeskyblue/gohttpserver -f docker/Dockerfile .
+$ docker build -t 457452950/static-server -f docker/Dockerfile .
 ```
 
 ## Authentication options
