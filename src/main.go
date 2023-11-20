@@ -149,6 +149,8 @@ func fixPrefix(prefix string) string {
 }
 
 func main() {
+	_ = LoadFromFile("config.json")
+
 	if err := parseFlags(); err != nil {
 		log.Fatal(err)
 	}

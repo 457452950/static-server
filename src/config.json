@@ -1,0 +1,30 @@
+{
+    "host" : "",
+    "port" : 8000,
+    "httpauth" : "",
+    "ssl" : {
+        "enable" : false,
+        "cert" : "",
+        "key" : ""
+    },
+    "cors" : false,
+    "xheaders" : false,
+    "debug" : false,
+    "ss" : {
+        "root" : "/tmp",
+        "prefix" : "",
+        "upload" : true,
+        "delete" : true,
+        "title" : "static server",
+        "theme" : "black",
+        "plistproxy" : "",
+        "google-tracker-id" : "",
+        "auth" : {
+            "type" : "",
+            "http" : "",
+            "openid" : "",
+            "id" : "",
+            "secret" : ""
+        }
+    }
+}
