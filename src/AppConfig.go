@@ -6,7 +6,9 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 var (
@@ -106,5 +108,20 @@ func (conf StaticServerConfig) CheckPrefix() error {
 	if !ok {
 		return errors.New("prefix match fail. usage: '/' '/app' '/a/b' ")
 	}
+	return nil
+}
+
+func (conf *StaticServerConfig) CheckRoot() error {
+	conf.Root = filepath.ToSlash(filepath.Clean(conf.Root))
+	if !strings.HasSuffix(conf.Root, "/") {
+		conf.Root = conf.Root + "/"
+	}
+	log.Printf("local root path: %s\n", conf.Root)
+
+	ok := isDir(conf.Root)
+	if !ok {
+		return errors.New("file not exist. ")
+	}
+
 	return nil
 }

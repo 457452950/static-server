@@ -140,6 +140,7 @@ func main() {
 
 	ss := NewHTTPStaticServer(app_config.StSrvConf)
 
+	// plist config
 	// if gcfg.PlistProxy != "" {
 	// 	u, err := url.Parse(gcfg.PlistProxy)
 	// 	if err != nil {
@@ -156,10 +157,10 @@ func main() {
 
 	hdlr = accesslog.NewLoggingHandler(hdlr, logger)
 
-	// HTTP Basic Authentication
-	userpass := strings.SplitN(app_config.StSrvConf.Auth.HTTP, ":", 2)
 	switch app_config.StSrvConf.Auth.Type {
 	case "http":
+		// HTTP Basic Authentication
+		userpass := strings.SplitN(app_config.StSrvConf.Auth.HTTP, ":", 2)
 		if len(userpass) == 2 {
 			user, pass := userpass[0], userpass[1]
 			hdlr = httpauth.SimpleBasicAuth(user, pass)(hdlr)

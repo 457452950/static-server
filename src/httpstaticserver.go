@@ -10,7 +10,6 @@ import (
 	"log"
 	"mime"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -49,24 +48,25 @@ type Directory struct {
 type HTTPStaticServer struct {
 	Config StaticServerConfig
 
-	indexes []IndexFileItem
-	m       *mux.Router
-	bufPool sync.Pool // use sync.Pool caching buf to reduce gc ratio
+	indexes    []IndexFileItem
+	mux_router *mux.Router
+	bufPool    sync.Pool // use sync.Pool caching buf to reduce gc ratio
 }
 
 func NewHTTPStaticServer(conf StaticServerConfig) *HTTPStaticServer {
-	root := filepath.ToSlash(filepath.Clean(conf.Root))
-	if !strings.HasSuffix(root, "/") {
-		root = root + "/"
+	if err := conf.CheckPrefix(); err != nil {
+		panic(err)
 	}
-	log.Printf("local root path: %s\n", root)
-	conf.Root = root
 
-	m := mux.NewRouter()
+	if err := conf.CheckRoot(); err != nil {
+		panic(err)
+	}
+
+	router := mux.NewRouter()
 
 	s := &HTTPStaticServer{
-		Config: conf,
-		m:      m,
+		Config:     conf,
+		mux_router: router,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
 		},
@@ -88,14 +88,14 @@ func NewHTTPStaticServer(conf StaticServerConfig) *HTTPStaticServer {
 	// m.HandleFunc("/-/ipa/plist/{path:.*}", s.hPlist)
 	// m.HandleFunc("/-/ipa/link/{path:.*}", s.hIpaLink)
 
-	m.HandleFunc("/{path:.*}", s.hIndex).Methods("GET", "HEAD")
-	m.HandleFunc("/{path:.*}", s.hUploadOrMkdir).Methods("POST")
-	m.HandleFunc("/{path:.*}", s.hDelete).Methods("DELETE")
+	router.HandleFunc("/{path:.*}", s.handleIndex).Methods("GET", "HEAD")
+	router.HandleFunc("/{path:.*}", s.hUploadOrMkdir).Methods("POST")
+	router.HandleFunc("/{path:.*}", s.handleDelete).Methods("DELETE")
 	return s
 }
 
 func (s *HTTPStaticServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.m.ServeHTTP(w, r)
+	s.mux_router.ServeHTTP(w, r)
 }
 
 // Return real path with Seperator(/)
@@ -113,7 +113,7 @@ func (s *HTTPStaticServer) getRealPath(r *http.Request) string {
 	return filepath.ToSlash(realPath)
 }
 
-func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
+func (s *HTTPStaticServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
 	realPath := s.getRealPath(r)
 	if r.FormValue("json") == "true" {
@@ -152,7 +152,7 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (s *HTTPStaticServer) hDelete(w http.ResponseWriter, req *http.Request) {
+func (s *HTTPStaticServer) handleDelete(w http.ResponseWriter, req *http.Request) {
 	path := mux.Vars(req)["path"]
 	realPath := s.getRealPath(req)
 	// path = filepath.Clean(path) // for safe reason, prevent path contain ..
@@ -357,44 +357,44 @@ func (s *HTTPStaticServer) hUnzip(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func combineURL(r *http.Request, path string) *url.URL {
-	return &url.URL{
-		Scheme: r.URL.Scheme,
-		Host:   r.Host,
-		Path:   path,
-	}
-}
+// func combineURL(r *http.Request, path string) *url.URL {
+// 	return &url.URL{
+// 		Scheme: r.URL.Scheme,
+// 		Host:   r.Host,
+// 		Path:   path,
+// 	}
+// }
 
-func (s *HTTPStaticServer) hPlist(w http.ResponseWriter, r *http.Request) {
-	path := mux.Vars(r)["path"]
-	// rename *.plist to *.ipa
-	if filepath.Ext(path) == ".plist" {
-		path = path[0:len(path)-6] + ".ipa"
-	}
+// func (s *HTTPStaticServer) hPlist(w http.ResponseWriter, r *http.Request) {
+// 	path := mux.Vars(r)["path"]
+// 	// rename *.plist to *.ipa
+// 	if filepath.Ext(path) == ".plist" {
+// 		path = path[0:len(path)-6] + ".ipa"
+// 	}
 
-	relPath := s.getRealPath(r)
-	plinfo, err := parseIPA(relPath)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+// 	relPath := s.getRealPath(r)
+// 	plinfo, err := parseIPA(relPath)
+// 	if err != nil {
+// 		http.Error(w, err.Error(), 500)
+// 		return
+// 	}
 
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	baseURL := &url.URL{
-		Scheme: scheme,
-		Host:   r.Host,
-	}
-	data, err := generateDownloadPlist(baseURL, path, plinfo)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	w.Header().Set("Content-Type", "text/xml")
-	w.Write(data)
-}
+// 	scheme := "http"
+// 	if r.TLS != nil {
+// 		scheme = "https"
+// 	}
+// 	baseURL := &url.URL{
+// 		Scheme: scheme,
+// 		Host:   r.Host,
+// 	}
+// 	data, err := generateDownloadPlist(baseURL, path, plinfo)
+// 	if err != nil {
+// 		http.Error(w, err.Error(), 500)
+// 		return
+// 	}
+// 	w.Header().Set("Content-Type", "text/xml")
+// 	w.Write(data)
+// }
 
 // func (s *HTTPStaticServer) hIpaLink(w http.ResponseWriter, r *http.Request) {
 // 	path := mux.Vars(r)["path"]
@@ -451,9 +451,9 @@ func (s *HTTPStaticServer) hPlist(w http.ResponseWriter, r *http.Request) {
 // 	return
 // }
 
-func (s *HTTPStaticServer) hFileOrDirectory(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, s.getRealPath(r))
-}
+// func (s *HTTPStaticServer) hFileOrDirectory(w http.ResponseWriter, r *http.Request) {
+// 	http.ServeFile(w, r, s.getRealPath(r))
+// }
 
 type HTTPFileInfo struct {
 	Name    string `json:"name"`
@@ -626,6 +626,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 
 var dirInfoSize = Directory{size: make(map[string]int64), mutex: &sync.RWMutex{}}
 
+// todo: thread safe ???
 func (s *HTTPStaticServer) makeIndex() error {
 	var indexes = make([]IndexFileItem, 0)
 	var err = filepath.Walk(s.Config.Root, func(path string, info os.FileInfo, err error) error {
@@ -796,7 +797,7 @@ func renderHTML(w http.ResponseWriter, name string, v interface{}) {
 
 func checkFilename(name string) error {
 	if strings.ContainsAny(name, "\\/:*<>|") {
-		return errors.New("Name should not contains \\/:*<>|")
+		return errors.New("fiel name should not contains \\/:*<>| ")
 	}
 	return nil
 }
