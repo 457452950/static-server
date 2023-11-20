@@ -1,7 +1,7 @@
 <html>
 
 <head>
-  <title>[[.Name]] install</title>
+  <title>[[.Config.Name]] install</title>
   <meta http-equiv="Content-Type" content="text/HTML; charset=utf-8">
   <meta content="target-densitydpi=device-dpi,width=640" name="viewport" id="viewport">
   <link rel="shortcut icon" type="image/png" href="/-/assets/favicon.png" />
@@ -16,7 +16,7 @@
       var os_info = parser.getOS();
       console.log(os_info)
 
-      var plistLink = "[[.PlistLink]]";
+      var plistLink = "[[.Config.PlistLink]]";
       var ipaInstallLink = 'itms-services://?action=download-manifest&url=' + plistLink;
       document.getElementById('itms-link').href = ipaInstallLink;
 

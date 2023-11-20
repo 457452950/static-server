@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,36 +47,26 @@ type Directory struct {
 }
 
 type HTTPStaticServer struct {
-	Root            string
-	Prefix          string
-	Upload          bool
-	Delete          bool
-	Title           string
-	Theme           string
-	PlistProxy      string
-	GoogleTrackerID string
-	AuthType        string
+	Config StaticServerConfig
 
 	indexes []IndexFileItem
 	m       *mux.Router
 	bufPool sync.Pool // use sync.Pool caching buf to reduce gc ratio
 }
 
-func NewHTTPStaticServer(root string) *HTTPStaticServer {
-	// if root == "" {
-	// 	root = "./"
-	// }
-	// root = filepath.ToSlash(root)
-	root = filepath.ToSlash(filepath.Clean(root))
+func NewHTTPStaticServer(conf StaticServerConfig) *HTTPStaticServer {
+	root := filepath.ToSlash(filepath.Clean(conf.Root))
 	if !strings.HasSuffix(root, "/") {
 		root = root + "/"
 	}
-	log.Printf("root path: %s\n", root)
+	log.Printf("local root path: %s\n", root)
+	conf.Root = root
+
 	m := mux.NewRouter()
+
 	s := &HTTPStaticServer{
-		Root:  root,
-		Theme: "black",
-		m:     m,
+		Config: conf,
+		m:      m,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
 		},
@@ -96,8 +85,8 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	}()
 
 	// routers for Apple *.ipa
-	m.HandleFunc("/-/ipa/plist/{path:.*}", s.hPlist)
-	m.HandleFunc("/-/ipa/link/{path:.*}", s.hIpaLink)
+	// m.HandleFunc("/-/ipa/plist/{path:.*}", s.hPlist)
+	// m.HandleFunc("/-/ipa/link/{path:.*}", s.hIpaLink)
 
 	m.HandleFunc("/{path:.*}", s.hIndex).Methods("GET", "HEAD")
 	m.HandleFunc("/{path:.*}", s.hUploadOrMkdir).Methods("POST")
@@ -116,11 +105,11 @@ func (s *HTTPStaticServer) getRealPath(r *http.Request) string {
 		path = "/" + path
 	}
 	path = filepath.Clean(path) // prevent .. for safe issues
-	relativePath, err := filepath.Rel(s.Prefix, path)
+	relativePath, err := filepath.Rel(s.Config.Prefix, path)
 	if err != nil {
 		relativePath = path
 	}
-	realPath := filepath.Join(s.Root, relativePath)
+	realPath := filepath.Join(s.Config.Root, relativePath)
 	return filepath.ToSlash(realPath)
 }
 
@@ -361,7 +350,7 @@ func (s *HTTPStaticServer) hUnzip(w http.ResponseWriter, r *http.Request) {
 	if ctype != "" {
 		w.Header().Set("Content-Type", ctype)
 	}
-	err := ExtractFromZip(filepath.Join(s.Root, zipPath), path, w)
+	err := ExtractFromZip(filepath.Join(s.Config.Root, zipPath), path, w)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
@@ -407,60 +396,60 @@ func (s *HTTPStaticServer) hPlist(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func (s *HTTPStaticServer) hIpaLink(w http.ResponseWriter, r *http.Request) {
-	path := mux.Vars(r)["path"]
-	var plistUrl string
+// func (s *HTTPStaticServer) hIpaLink(w http.ResponseWriter, r *http.Request) {
+// 	path := mux.Vars(r)["path"]
+// 	var plistUrl string
 
-	if r.URL.Scheme == "https" {
-		plistUrl = combineURL(r, "/-/ipa/plist/"+path).String()
-	} else if s.PlistProxy != "" {
-		httpPlistLink := "http://" + r.Host + "/-/ipa/plist/" + path
-		url, err := s.genPlistLink(httpPlistLink)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		plistUrl = url
-	} else {
-		http.Error(w, "500: Server should be https:// or provide valid plistproxy", 500)
-		return
-	}
+// 	if r.URL.Scheme == "https" {
+// 		plistUrl = combineURL(r, "/-/ipa/plist/"+path).String()
+// 	} else if s.PlistProxy != "" {
+// 		httpPlistLink := "http://" + r.Host + "/-/ipa/plist/" + path
+// 		url, err := s.genPlistLink(httpPlistLink)
+// 		if err != nil {
+// 			http.Error(w, err.Error(), 500)
+// 			return
+// 		}
+// 		plistUrl = url
+// 	} else {
+// 		http.Error(w, "500: Server should be https:// or provide valid plistproxy", 500)
+// 		return
+// 	}
 
-	w.Header().Set("Content-Type", "text/html")
-	log.Println("PlistURL:", plistUrl)
-	renderHTML(w, "assets/ipa-install.html", map[string]string{
-		"Name":      filepath.Base(path),
-		"PlistLink": plistUrl,
-	})
-}
+// 	w.Header().Set("Content-Type", "text/html")
+// 	log.Println("PlistURL:", plistUrl)
+// 	renderHTML(w, "assets/ipa-install.html", map[string]string{
+// 		"Name":      filepath.Base(path),
+// 		"PlistLink": plistUrl,
+// 	})
+// }
 
-func (s *HTTPStaticServer) genPlistLink(httpPlistLink string) (plistUrl string, err error) {
-	// Maybe need a proxy, a little slowly now.
-	pp := s.PlistProxy
-	if pp == "" {
-		pp = defaultPlistProxy
-	}
-	resp, err := http.Get(httpPlistLink)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
+// func (s *HTTPStaticServer) genPlistLink(httpPlistLink string) (plistUrl string, err error) {
+// 	// Maybe need a proxy, a little slowly now.
+// 	pp := s.PlistProxy
+// 	if pp == "" {
+// 		pp = defaultPlistProxy
+// 	}
+// 	resp, err := http.Get(httpPlistLink)
+// 	if err != nil {
+// 		return
+// 	}
+// 	defer resp.Body.Close()
 
-	data, _ := ioutil.ReadAll(resp.Body)
-	retData, err := http.Post(pp, "text/xml", bytes.NewBuffer(data))
-	if err != nil {
-		return
-	}
-	defer retData.Body.Close()
+// 	data, _ := ioutil.ReadAll(resp.Body)
+// 	retData, err := http.Post(pp, "text/xml", bytes.NewBuffer(data))
+// 	if err != nil {
+// 		return
+// 	}
+// 	defer retData.Body.Close()
 
-	jsonData, _ := ioutil.ReadAll(retData.Body)
-	var ret map[string]string
-	if err = json.Unmarshal(jsonData, &ret); err != nil {
-		return
-	}
-	plistUrl = pp + "/" + ret["key"]
-	return
-}
+// 	jsonData, _ := ioutil.ReadAll(retData.Body)
+// 	var ret map[string]string
+// 	if err = json.Unmarshal(jsonData, &ret); err != nil {
+// 		return
+// 	}
+// 	plistUrl = pp + "/" + ret["key"]
+// 	return
+// }
 
 func (s *HTTPStaticServer) hFileOrDirectory(w http.ResponseWriter, r *http.Request) {
 	http.ServeFile(w, r, s.getRealPath(r))
@@ -639,7 +628,7 @@ var dirInfoSize = Directory{size: make(map[string]int64), mutex: &sync.RWMutex{}
 
 func (s *HTTPStaticServer) makeIndex() error {
 	var indexes = make([]IndexFileItem, 0)
-	var err = filepath.Walk(s.Root, func(path string, info os.FileInfo, err error) error {
+	var err = filepath.Walk(s.Config.Root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
 			return filepath.SkipDir
@@ -649,7 +638,7 @@ func (s *HTTPStaticServer) makeIndex() error {
 			return nil
 		}
 
-		path, _ = filepath.Rel(s.Root, path)
+		path, _ = filepath.Rel(s.Config.Root, path)
 		path = filepath.ToSlash(path)
 		indexes = append(indexes, IndexFileItem{path, info})
 		return nil
@@ -708,16 +697,16 @@ func (s *HTTPStaticServer) findIndex(text string) []IndexFileItem {
 
 func (s *HTTPStaticServer) defaultAccessConf() AccessConf {
 	return AccessConf{
-		Upload: s.Upload,
-		Delete: s.Delete,
+		Upload: s.Config.Upload,
+		Delete: s.Config.Delete,
 	}
 }
 
 func (s *HTTPStaticServer) readAccessConf(realPath string) (ac AccessConf) {
-	relativePath, err := filepath.Rel(s.Root, realPath)
+	relativePath, err := filepath.Rel(s.Config.Root, realPath)
 	if err != nil || relativePath == "." || relativePath == "" { // actually relativePath is always "." if root == realPath
 		ac = s.defaultAccessConf()
-		realPath = s.Root
+		realPath = s.Config.Root
 	} else {
 		parentPath := filepath.Dir(realPath)
 		ac = s.readAccessConf(parentPath)

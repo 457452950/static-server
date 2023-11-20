@@ -4,21 +4,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"log"
-	"net"
 	"net/http"
-	"net/url"
 	"os"
-	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"text/template"
 
-	"github.com/alecthomas/kingpin"
 	accesslog "github.com/codeskyblue/go-accesslog"
-	"github.com/go-yaml/yaml"
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
@@ -58,10 +51,10 @@ func (l httpLogger) Log(record accesslog.LogRecord) {
 }
 
 var (
-	defaultPlistProxy = "https://plistproxy.herokuapp.com/plist"
-	defaultOpenID     = "https://login.netease.com/openid"
-	gcfg              = Configure{}
-	logger            = httpLogger{}
+	// defaultPlistProxy = "https://plistproxy.herokuapp.com/plist"
+	// defaultOpenID     = "https://login.netease.com/openid"
+	// gcfg              = Configure{}
+	logger = httpLogger{}
 
 	VERSION   = "unknown"
 	BUILDTIME = "unknown time"
@@ -89,118 +82,90 @@ func versionMessage() string {
 	return buf.String()
 }
 
-func parseFlags() error {
-	// initial default conf
-	gcfg.Root = "./"
-	gcfg.Port = 8000
-	gcfg.Addr = ""
-	gcfg.Theme = "black"
-	gcfg.PlistProxy = defaultPlistProxy
-	gcfg.Auth.OpenID = defaultOpenID
-	gcfg.GoogleTrackerID = "UA-81205425-2"
-	gcfg.Title = "Go HTTP File Server"
+// func parseFlags() error {
+// 	// initial default conf
+// 	gcfg.Root = "./"
+// 	gcfg.Port = 8000
+// 	gcfg.Addr = ""
+// 	gcfg.Theme = "black"
+// 	gcfg.PlistProxy = defaultPlistProxy
+// 	gcfg.Auth.OpenID = defaultOpenID
+// 	gcfg.GoogleTrackerID = "UA-81205425-2"
+// 	gcfg.Title = "Go HTTP File Server"
 
-	kingpin.HelpFlag.Short('h')
-	kingpin.Version(versionMessage())
-	kingpin.Flag("conf", "config file path, yaml format").FileVar(&gcfg.Conf)
-	kingpin.Flag("root", "root directory, default ./").Short('r').StringVar(&gcfg.Root)
-	kingpin.Flag("prefix", "url prefix, eg /foo").StringVar(&gcfg.Prefix)
-	kingpin.Flag("port", "listen port, default 8000").IntVar(&gcfg.Port)
-	kingpin.Flag("addr", "listen address, eg 127.0.0.1:8000").Short('a').StringVar(&gcfg.Addr)
-	kingpin.Flag("cert", "tls cert.pem path").StringVar(&gcfg.Cert)
-	kingpin.Flag("key", "tls key.pem path").StringVar(&gcfg.Key)
-	kingpin.Flag("auth-type", "Auth type <http|openid>").StringVar(&gcfg.Auth.Type)
-	kingpin.Flag("auth-http", "HTTP basic auth (ex: user:pass)").StringVar(&gcfg.Auth.HTTP)
-	kingpin.Flag("auth-openid", "OpenID auth identity url").StringVar(&gcfg.Auth.OpenID)
-	kingpin.Flag("theme", "web theme, one of <black|green>").StringVar(&gcfg.Theme)
-	kingpin.Flag("upload", "enable upload support").BoolVar(&gcfg.Upload)
-	kingpin.Flag("delete", "enable delete support").BoolVar(&gcfg.Delete)
-	kingpin.Flag("xheaders", "used when behide nginx").BoolVar(&gcfg.XHeaders)
-	kingpin.Flag("cors", "enable cross-site HTTP request").BoolVar(&gcfg.Cors)
-	kingpin.Flag("debug", "enable debug mode").BoolVar(&gcfg.Debug)
-	kingpin.Flag("plistproxy", "plist proxy when server is not https").Short('p').StringVar(&gcfg.PlistProxy)
-	kingpin.Flag("title", "server title").StringVar(&gcfg.Title)
-	kingpin.Flag("google-tracker-id", "set to empty to disable it").StringVar(&gcfg.GoogleTrackerID)
+// 	kingpin.HelpFlag.Short('h')
+// 	kingpin.Version(versionMessage())
+// 	kingpin.Flag("conf", "config file path, yaml format").FileVar(&gcfg.Conf)
+// 	kingpin.Flag("root", "root directory, default ./").Short('r').StringVar(&gcfg.Root)
+// 	kingpin.Flag("prefix", "url prefix, eg /foo").StringVar(&gcfg.Prefix)
+// 	kingpin.Flag("port", "listen port, default 8000").IntVar(&gcfg.Port)
+// 	kingpin.Flag("addr", "listen address, eg 127.0.0.1:8000").Short('a').StringVar(&gcfg.Addr)
+// 	kingpin.Flag("cert", "tls cert.pem path").StringVar(&gcfg.Cert)
+// 	kingpin.Flag("key", "tls key.pem path").StringVar(&gcfg.Key)
+// 	kingpin.Flag("auth-type", "Auth type <http|openid>").StringVar(&gcfg.Auth.Type)
+// 	kingpin.Flag("auth-http", "HTTP basic auth (ex: user:pass)").StringVar(&gcfg.Auth.HTTP)
+// 	kingpin.Flag("auth-openid", "OpenID auth identity url").StringVar(&gcfg.Auth.OpenID)
+// 	kingpin.Flag("theme", "web theme, one of <black|green>").StringVar(&gcfg.Theme)
+// 	kingpin.Flag("upload", "enable upload support").BoolVar(&gcfg.Upload)
+// 	kingpin.Flag("delete", "enable delete support").BoolVar(&gcfg.Delete)
+// 	kingpin.Flag("xheaders", "used when behide nginx").BoolVar(&gcfg.XHeaders)
+// 	kingpin.Flag("cors", "enable cross-site HTTP request").BoolVar(&gcfg.Cors)
+// 	kingpin.Flag("debug", "enable debug mode").BoolVar(&gcfg.Debug)
+// 	kingpin.Flag("plistproxy", "plist proxy when server is not https").Short('p').StringVar(&gcfg.PlistProxy)
+// 	kingpin.Flag("title", "server title").StringVar(&gcfg.Title)
+// 	kingpin.Flag("google-tracker-id", "set to empty to disable it").StringVar(&gcfg.GoogleTrackerID)
 
-	kingpin.Parse() // first parse conf
+// 	kingpin.Parse() // first parse conf
 
-	if gcfg.Conf != nil {
-		defer func() {
-			kingpin.Parse() // command line priority high than conf
-		}()
-		ymlData, err := ioutil.ReadAll(gcfg.Conf)
-		if err != nil {
-			return err
-		}
-		return yaml.Unmarshal(ymlData, &gcfg)
-	}
-	return nil
-}
-
-func fixPrefix(prefix string) string {
-	prefix = regexp.MustCompile(`/*$`).ReplaceAllString(prefix, "")
-	if !strings.HasPrefix(prefix, "/") {
-		prefix = "/" + prefix
-	}
-	if prefix == "/" {
-		prefix = ""
-	}
-	return prefix
-}
+// 	if gcfg.Conf != nil {
+// 		defer func() {
+// 			kingpin.Parse() // command line priority high than conf
+// 		}()
+// 		ymlData, err := ioutil.ReadAll(gcfg.Conf)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		return yaml.Unmarshal(ymlData, &gcfg)
+// 	}
+// 	return nil
+// }
 
 func main() {
-	_ = LoadFromFile("config.json")
-
-	if err := parseFlags(); err != nil {
-		log.Fatal(err)
-	}
-	if gcfg.Debug {
-		data, _ := yaml.Marshal(gcfg)
-		fmt.Printf("--- config ---\n%s\n", string(data))
-	}
+	// init log seting
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
-	// make sure prefix matches: ^/.*[^/]$
-	gcfg.Prefix = fixPrefix(gcfg.Prefix)
-	if gcfg.Prefix != "" {
-		log.Printf("url prefix: %s", gcfg.Prefix)
-	}
+	// get config from file
+	app_config := LoadFromFile("config.json")
+	DumpConfig(app_config)
 
-	ss := NewHTTPStaticServer(gcfg.Root)
-	ss.Prefix = gcfg.Prefix
-	ss.Theme = gcfg.Theme
-	ss.Title = gcfg.Title
-	ss.GoogleTrackerID = gcfg.GoogleTrackerID
-	ss.Upload = gcfg.Upload
-	ss.Delete = gcfg.Delete
-	ss.AuthType = gcfg.Auth.Type
+	ss := NewHTTPStaticServer(app_config.StSrvConf)
 
-	if gcfg.PlistProxy != "" {
-		u, err := url.Parse(gcfg.PlistProxy)
-		if err != nil {
-			log.Fatal(err)
-		}
-		u.Scheme = "https"
-		ss.PlistProxy = u.String()
-	}
-	if ss.PlistProxy != "" {
-		log.Printf("plistproxy: %s", strconv.Quote(ss.PlistProxy))
-	}
+	// if gcfg.PlistProxy != "" {
+	// 	u, err := url.Parse(gcfg.PlistProxy)
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	u.Scheme = "https"
+	// 	ss.PlistProxy = u.String()
+	// }
+	// if ss.PlistProxy != "" {
+	// 	log.Printf("plistproxy: %s", strconv.Quote(ss.PlistProxy))
+	// }
 
 	var hdlr http.Handler = ss
 
 	hdlr = accesslog.NewLoggingHandler(hdlr, logger)
 
 	// HTTP Basic Authentication
-	userpass := strings.SplitN(gcfg.Auth.HTTP, ":", 2)
-	switch gcfg.Auth.Type {
+	userpass := strings.SplitN(app_config.StSrvConf.Auth.HTTP, ":", 2)
+	switch app_config.StSrvConf.Auth.Type {
 	case "http":
 		if len(userpass) == 2 {
 			user, pass := userpass[0], userpass[1]
 			hdlr = httpauth.SimpleBasicAuth(user, pass)(hdlr)
 		}
 	case "openid":
-		handleOpenID(gcfg.Auth.OpenID, false) // FIXME(ssx): set secure default to false
+		handleOpenID(app_config.StSrvConf.Auth.OpenID, false) // FIXME(ssx): set secure default to false
 		// case "github":
 		// 	handleOAuth2ID(gcfg.Auth.Type, gcfg.Auth.ID, gcfg.Auth.Secret) // FIXME(ssx): set secure default to false
 	case "oauth2-proxy":
@@ -208,24 +173,24 @@ func main() {
 	}
 
 	// CORS
-	if gcfg.Cors {
+	if app_config.Cors {
 		hdlr = handlers.CORS()(hdlr)
 	}
-	if gcfg.XHeaders {
+	if app_config.XHeaders {
 		hdlr = handlers.ProxyHeaders(hdlr)
 	}
 
 	mainRouter := mux.NewRouter()
 	router := mainRouter
-	if gcfg.Prefix != "" {
-		router = mainRouter.PathPrefix(gcfg.Prefix).Subrouter()
-		mainRouter.Handle(gcfg.Prefix, hdlr)
+	if app_config.StSrvConf.Prefix != "" {
+		router = mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Subrouter()
+		mainRouter.Handle(app_config.StSrvConf.Prefix, hdlr)
 		mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, gcfg.Prefix, http.StatusTemporaryRedirect)
+			http.Redirect(w, r, app_config.StSrvConf.Prefix, http.StatusTemporaryRedirect)
 		})
 	}
 
-	router.PathPrefix("/-/assets/").Handler(http.StripPrefix(gcfg.Prefix+"/-/", http.FileServer(Assets)))
+	router.PathPrefix("/-/assets/").Handler(http.StripPrefix(app_config.StSrvConf.Prefix+"/-/", http.FileServer(Assets)))
 	router.HandleFunc("/-/sysinfo", func(w http.ResponseWriter, r *http.Request) {
 		data, _ := json.Marshal(map[string]interface{}{
 			"version": VERSION,
@@ -236,23 +201,21 @@ func main() {
 	})
 	router.PathPrefix("/").Handler(hdlr)
 
-	if gcfg.Addr == "" {
-		gcfg.Addr = fmt.Sprintf(":%d", gcfg.Port)
+	// get local bind address
+	var local = app_config.Host
+	if local == "" {
+		local = getLocalIP()
 	}
-	if !strings.Contains(gcfg.Addr, ":") {
-		gcfg.Addr = ":" + gcfg.Addr
-	}
-	_, port, _ := net.SplitHostPort(gcfg.Addr)
-	log.Printf("listening on %s, local address http://%s:%s\n", strconv.Quote(gcfg.Addr), getLocalIP(), port)
+	log.Printf("local %s, address http://%s:%d\n", fmt.Sprintf("%s:%d", app_config.Host, app_config.Port), local, app_config.Port)
 
 	srv := &http.Server{
 		Handler: mainRouter,
-		Addr:    gcfg.Addr,
+		Addr:    fmt.Sprintf("%s:%d", app_config.Host, app_config.Port),
 	}
 
 	var err error
-	if gcfg.Key != "" && gcfg.Cert != "" {
-		err = srv.ListenAndServeTLS(gcfg.Cert, gcfg.Key)
+	if app_config.SSL.Enable {
+		err = srv.ListenAndServeTLS(app_config.SSL.Cert, app_config.SSL.Key)
 	} else {
 		err = srv.ListenAndServe()
 	}

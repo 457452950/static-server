@@ -9,9 +9,9 @@
     },
     "cors" : false,
     "xheaders" : false,
-    "debug" : false,
+    "debug" : true,
     "ss" : {
-        "root" : "/tmp",
+        "root" : "../",
         "prefix" : "",
         "upload" : true,
         "delete" : true,

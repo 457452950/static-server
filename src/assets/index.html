@@ -5,15 +5,15 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
   <meta name="theme-color" content="#000000">  
-  <title>[[.Title]]</title>
-  <link rel="shortcut icon" type="image/png" href="[[.Prefix]]/-/assets/favicon.png" />
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/bootstrap-3.3.5/css/bootstrap.min.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/font-awesome-4.6.3/css/font-awesome.min.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/github-markdown.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/dropzone.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/scrollUp-image.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/style.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/themes/[[.Theme]].css">
+  <title>[[.Config.Title]]</title>
+  <link rel="shortcut icon" type="image/png" href="[[.Config.Prefix]]/-/assets/favicon.png" />
+  <link rel="stylesheet" type="text/css" href="[[.Config.Prefix]]/-/assets/bootstrap-3.3.5/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="[[.Config.Prefix]]/-/assets/font-awesome-4.6.3/css/font-awesome.min.css">
+  <link rel="stylesheet" type="text/css" href="[[.Config.Prefix]]/-/assets/css/github-markdown.css">
+  <link rel="stylesheet" type="text/css" href="[[.Config.Prefix]]/-/assets/css/dropzone.css">
+  <link rel="stylesheet" type="text/css" href="[[.Config.Prefix]]/-/assets/css/scrollUp-image.css">
+  <link rel="stylesheet" type="text/css" href="[[.Config.Prefix]]/-/assets/css/style.css">
+  <link rel="stylesheet" type="text/css" href="[[.Config.Prefix]]/-/assets/themes/[[.Config.Theme]].css">
 </head>
 
 <body id="app">
@@ -27,7 +27,7 @@
             <span class="icon-bar"></span>
             <span class="icon-bar"></span>
           </button>
-          <a class="navbar-brand" href="[[.Prefix]]/">[[.Title]]</a>
+          <a class="navbar-brand" href="[[.Config.Prefix]]/">[[.Config.Title]]</a>
         </div>
         <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-2">
           <ul class="nav navbar-nav">
@@ -37,7 +37,7 @@
                 <span class="glyphicon glyphicon-qrcode"></span>
               </a>
             </li>
-            [[if eq .AuthType "openid"]]
+            [[if eq .Config.Auth.Type "openid"]]
             <template v-if="!user.email">
               <a href="/-/login" class="btn btn-sm btn-default navbar-btn">
                 Sign in <span class="glyphicon glyphicon-user"></span>
@@ -50,7 +50,7 @@
               </a>
             </template>
             [[end]]
-            [[if eq .AuthType "oauth2-proxy"]]
+            [[if eq .Config.Auth.Type "oauth2-proxy"]]
             <template v-if="!user.email">
                 <a href="#" class="btn btn-sm btn-default navbar-btn">
                     Guest <span class="glyphicon glyphicon-user"></span>
@@ -261,27 +261,27 @@
     </div>
   </div>
   <script>
-    window.URL_PFEFIX = "[[.Prefix]]"
+    window.URL_PFEFIX = "[[.Config.Prefix]]"
   </script>
-  <script src="[[.Prefix]]/-/assets/js/jquery-3.1.0.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/jquery.qrcode.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/jquery.scrollUp.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/qrcode.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/vue-1.0.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/showdown-1.6.4.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/moment.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/dropzone.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/underscore-min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/clipboard-1.5.12.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/bootstrap-3.3.5/js/bootstrap.min.js"></script>
-  <script src='[[.Prefix]]/-/assets/[["js/index.js" | urlhash ]]'></script>
-  <!-- <script src="[[.Prefix]]/-/assets/js/index.js"></script> -->
+  <script src="[[.Config.Prefix]]/-/assets/js/jquery-3.1.0.min.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/js/jquery.qrcode.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/js/jquery.scrollUp.min.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/js/qrcode.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/js/vue-1.0.min.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/js/showdown-1.6.4.min.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/js/moment.min.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/js/dropzone.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/js/underscore-min.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/js/clipboard-1.5.12.min.js"></script>
+  <script src="[[.Config.Prefix]]/-/assets/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+  <script src='[[.Config.Prefix]]/-/assets/[["js/index.js" | urlhash ]]'></script>
+  <!-- <script src="[[.Config.Prefix]]/-/assets/js/index.js"></script> -->
   <!--Sync status bar color with border-color on mobile platforms.-->
   <script>
     var META = document.getElementsByTagName("meta");
     META[2]["content"]=$('.navbar').css('border-color');
   </script>
-  [[if .GoogleTrackerID ]]
+  [[if .Config.GoogleTrackerID ]]
   <script>
     (function (i, s, o, g, r, a, m) {
       i['GoogleAnalyticsObject'] = r;
@@ -295,7 +295,7 @@
       m.parentNode.insertBefore(a, m)
     })(window, document, 'script', 'https://www.google-analytics.com/analytics.js', 'ga');
 
-    ga('create', '[[.GoogleTrackerID]]', 'auto');
+    ga('create', '[[.Config.GoogleTrackerID]]', 'auto');
     ga('send', 'pageview');
   </script> [[ end ]]
 </body>

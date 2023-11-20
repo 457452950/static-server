@@ -2,9 +2,16 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"log"
 	"os"
+	"regexp"
+)
+
+var (
+	prefix_match_reg = "^(/.+)+$"
+	reg_prefix_match = regexp.MustCompile(prefix_match_reg)
 )
 
 type StaticServerConfig struct {
@@ -19,7 +26,7 @@ type StaticServerConfig struct {
 	Auth            struct {
 		Type   string `json:"type"`
 		HTTP   string `json:"http"`
-		Openid string `json:"openid"`
+		OpenID string `json:"openid"`
 		ID     string `json:"id"`     // for oauth2
 		Secret string `json:"secret"` // for oauth2
 	} `json:"auth"`
@@ -35,7 +42,7 @@ type AppConfig struct {
 		Key    string `json:"key"`
 	} `json:"ssl"`
 	Cors      bool               `json:"cors"`
-	Xheaders  bool               `json:"xheaders"`
+	XHeaders  bool               `json:"xheaders"`
 	Debug     bool               `json:"debug"`
 	StSrvConf StaticServerConfig `json:"ss"`
 }
@@ -78,4 +85,26 @@ func LoadFromFile(file string) AppConfig {
 	}
 
 	return conf
+}
+
+func DumpConfig(conf AppConfig) {
+	data, err := json.Marshal(conf)
+	if err != nil {
+		log.Println(err)
+		return
+	}
+
+	log.Println(string(data))
+}
+
+func (conf StaticServerConfig) CheckPrefix() error {
+	if conf.Prefix == "" {
+		return nil
+	}
+
+	ok := reg_prefix_match.MatchString(conf.Prefix)
+	if !ok {
+		return errors.New("prefix match fail. usage: '/' '/app' '/a/b' ")
+	}
+	return nil
 }
