@@ -21,19 +21,10 @@ import (
 
 	"github.com/go-yaml/yaml"
 	"github.com/gorilla/mux"
-	"github.com/shogo82148/androidbinary/apk"
+	"static-server/files"
 )
 
 const YAMLCONF = ".ghs.yml"
-
-type ApkInfo struct {
-	PackageName  string `json:"packageName"`
-	MainActivity string `json:"mainActivity"`
-	Version      struct {
-		Code int    `json:"code"`
-		Name string `json:"name"`
-	} `json:"version"`
-}
 
 type IndexFileItem struct {
 	Path string
@@ -48,9 +39,10 @@ type Directory struct {
 type HTTPStaticServer struct {
 	Config StaticServerConfig
 
-	indexes    []IndexFileItem
-	mux_router *mux.Router
-	bufPool    sync.Pool // use sync.Pool caching buf to reduce gc ratio
+	fileTransformer files.FileTransformer
+	indexes         []IndexFileItem
+	muxRouter       *mux.Router
+	bufPool         sync.Pool // use sync.Pool caching buf to reduce gc ratio
 }
 
 func NewHTTPStaticServer(conf StaticServerConfig) *HTTPStaticServer {
@@ -65,8 +57,9 @@ func NewHTTPStaticServer(conf StaticServerConfig) *HTTPStaticServer {
 	router := mux.NewRouter()
 
 	s := &HTTPStaticServer{
-		Config:     conf,
-		mux_router: router,
+		Config:          conf,
+		fileTransformer: files.CreateNewFileTransformer(conf.Root),
+		muxRouter:       router,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
 		},
@@ -95,12 +88,15 @@ func NewHTTPStaticServer(conf StaticServerConfig) *HTTPStaticServer {
 }
 
 func (s *HTTPStaticServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	s.mux_router.ServeHTTP(w, r)
+	s.muxRouter.ServeHTTP(w, r)
 }
 
 // Return real path with Seperator(/)
 func (s *HTTPStaticServer) getRealPath(r *http.Request) string {
 	path := mux.Vars(r)["path"]
+	mp, err := s.fileTransformer.TransformPath(path)
+	log.Printf("transform path {%s}  {%s} \n", mp, err)
+
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
 	}
@@ -115,6 +111,8 @@ func (s *HTTPStaticServer) getRealPath(r *http.Request) string {
 
 func (s *HTTPStaticServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
+	log.Printf("request path {%s}.\n", path)
+
 	realPath := s.getRealPath(r)
 	if r.FormValue("json") == "true" {
 		s.hJSONList(w, r)
@@ -154,6 +152,8 @@ func (s *HTTPStaticServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 
 func (s *HTTPStaticServer) handleDelete(w http.ResponseWriter, req *http.Request) {
 	path := mux.Vars(req)["path"]
+	log.Printf("delete path {%s}.\n", path)
+
 	realPath := s.getRealPath(req)
 	// path = filepath.Clean(path) // for safe reason, prevent path contain ..
 	auth := s.readAccessConf(realPath)
@@ -177,6 +177,9 @@ func (s *HTTPStaticServer) handleDelete(w http.ResponseWriter, req *http.Request
 }
 
 func (s *HTTPStaticServer) hUploadOrMkdir(w http.ResponseWriter, req *http.Request) {
+	path := mux.Vars(req)["path"]
+	log.Printf("upload mkdir path {%s}.\n", path)
+
 	dirpath := s.getRealPath(req)
 
 	// check auth
@@ -288,25 +291,6 @@ type FileJSONInfo struct {
 	Extra   interface{} `json:"extra,omitempty"`
 }
 
-// path should be absolute
-func parseApkInfo(path string) (ai *ApkInfo) {
-	defer func() {
-		if err := recover(); err != nil {
-			log.Println("parse-apk-info panic:", err)
-		}
-	}()
-	apkf, err := apk.OpenFile(path)
-	if err != nil {
-		return
-	}
-	ai = &ApkInfo{}
-	ai.MainActivity, _ = apkf.MainActivity()
-	ai.PackageName = apkf.PackageName()
-	ai.Version.Code = apkf.Manifest().VersionCode
-	ai.Version.Name = apkf.Manifest().VersionName
-	return
-}
-
 func (s *HTTPStaticServer) hInfo(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
 	relPath := s.getRealPath(r)
@@ -324,15 +308,15 @@ func (s *HTTPStaticServer) hInfo(w http.ResponseWriter, r *http.Request) {
 	}
 	ext := filepath.Ext(path)
 	switch ext {
-	case ".md":
-		fji.Type = "markdown"
-	case ".apk":
-		fji.Type = "apk"
-		fji.Extra = parseApkInfo(relPath)
+	case files.FILE_TYPE_MARKDOWN_SUFFIX:
+		fji.Type = files.FILE_TYPE_MARKDOWN
+	case files.FILE_TYPE_APK_SUFFIX:
+		fji.Type = files.FILE_TYPE_APK
+		fji.Extra = files.GetApkInfo(relPath)
 	case "":
-		fji.Type = "dir"
+		fji.Type = files.FILE_TYPE_DIR
 	default:
-		fji.Type = "text"
+		fji.Type = files.FILE_TYPE_TEXT
 	}
 	data, _ := json.Marshal(fji)
 	w.Header().Set("Content-Type", "application/json")
@@ -555,6 +539,8 @@ func (c *AccessConf) canUpload(r *http.Request) bool {
 
 func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	requestPath := mux.Vars(r)["path"]
+	log.Printf("hJSONList path {%s}.\n", requestPath)
+
 	realPath := s.getRealPath(r)
 	search := r.FormValue("search")
 	auth := s.readAccessConf(realPath)
@@ -607,7 +593,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			name := deepPath(realPath, info.Name())
 			lr.Name = name
 			lr.Path = filepath.Join(filepath.Dir(path), name)
-			lr.Type = "dir"
+			lr.Type = files.FILE_TYPE_DIR
 			lr.Size = s.historyDirSize(lr.Path)
 		} else {
 			lr.Type = "file"

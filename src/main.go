@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"github.com/codeskyblue/go-accesslog"
 	"log"
 	"net/http"
 	"os"
@@ -11,10 +12,11 @@ import (
 	"strings"
 	"text/template"
 
-	accesslog "github.com/codeskyblue/go-accesslog"
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
+
+	accesslogger "static-server/logger"
 )
 
 type Configure struct {
@@ -44,17 +46,11 @@ type Configure struct {
 	} `yaml:"auth"`
 }
 
-type httpLogger struct{}
-
-func (l httpLogger) Log(record accesslog.LogRecord) {
-	log.Printf("%s - %s %d %s", record.Ip, record.Method, record.Status, record.Uri)
-}
-
 var (
 	// defaultPlistProxy = "https://plistproxy.herokuapp.com/plist"
 	// defaultOpenID     = "https://login.netease.com/openid"
 	// gcfg              = Configure{}
-	logger = httpLogger{}
+	logger = accesslogger.GetLogger()
 
 	VERSION   = "unknown"
 	BUILDTIME = "unknown time"
