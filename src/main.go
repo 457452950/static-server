@@ -2,60 +2,58 @@ package main
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
-	"github.com/codeskyblue/go-accesslog"
 	"log"
 	"net/http"
-	"os"
 	"runtime"
 	"strings"
 	"text/template"
 
+	"github.com/codeskyblue/go-accesslog"
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 
-	accesslogger "static-server/logger"
+	"static-server/config"
+	"static-server/logger"
 )
 
-type Configure struct {
-	Conf            *os.File `yaml:"-"`
-	Addr            string   `yaml:"addr"`
-	Port            int      `yaml:"port"`
-	Root            string   `yaml:"root"`
-	Prefix          string   `yaml:"prefix"`
-	HTTPAuth        string   `yaml:"httpauth"`
-	Cert            string   `yaml:"cert"`
-	Key             string   `yaml:"key"`
-	Cors            bool     `yaml:"cors"`
-	Theme           string   `yaml:"theme"`
-	XHeaders        bool     `yaml:"xheaders"`
-	Upload          bool     `yaml:"upload"`
-	Delete          bool     `yaml:"delete"`
-	PlistProxy      string   `yaml:"plistproxy"`
-	Title           string   `yaml:"title"`
-	Debug           bool     `yaml:"debug"`
-	GoogleTrackerID string   `yaml:"google-tracker-id"`
-	Auth            struct {
-		Type   string `yaml:"type"` // openid|http|github
-		OpenID string `yaml:"openid"`
-		HTTP   string `yaml:"http"`
-		ID     string `yaml:"id"`     // for oauth2
-		Secret string `yaml:"secret"` // for oauth2
-	} `yaml:"auth"`
-}
+// type Configure struct {
+// 	Conf            *os.File `yaml:"-"`
+// 	Addr            string   `yaml:"addr"`
+// 	Port            int      `yaml:"port"`
+// 	Root            string   `yaml:"root"`
+// 	Prefix          string   `yaml:"prefix"`
+// 	HTTPAuth        string   `yaml:"httpauth"`
+// 	Cert            string   `yaml:"cert"`
+// 	Key             string   `yaml:"key"`
+// 	Cors            bool     `yaml:"cors"`
+// 	Theme           string   `yaml:"theme"`
+// 	XHeaders        bool     `yaml:"xheaders"`
+// 	Upload          bool     `yaml:"upload"`
+// 	Delete          bool     `yaml:"delete"`
+// 	PlistProxy      string   `yaml:"plistproxy"`
+// 	Title           string   `yaml:"title"`
+// 	Debug           bool     `yaml:"debug"`
+// 	GoogleTrackerID string   `yaml:"google-tracker-id"`
+// 	Auth            struct {
+// 		Type   string `yaml:"type"` // openid|http|github
+// 		OpenID string `yaml:"openid"`
+// 		HTTP   string `yaml:"http"`
+// 		ID     string `yaml:"id"`     // for oauth2
+// 		Secret string `yaml:"secret"` // for oauth2
+// 	} `yaml:"auth"`
+// }
 
 var (
 	// defaultPlistProxy = "https://plistproxy.herokuapp.com/plist"
 	// defaultOpenID     = "https://login.netease.com/openid"
 	// gcfg              = Configure{}
-	logger = accesslogger.GetLogger()
 
 	VERSION   = "unknown"
 	BUILDTIME = "unknown time"
 	GITCOMMIT = "unknown git commit"
-	SITE      = "https://github.com/codeskyblue/gohttpserver"
+	SITE      = "https://github.com/457452950/static-server"
 )
 
 func versionMessage() string {
@@ -131,8 +129,8 @@ func main() {
 	log.SetFlags(log.Lshortfile | log.LstdFlags)
 
 	// get config from file
-	app_config := LoadFromFile("config.json")
-	DumpConfig(app_config)
+	app_config := config.LoadFromFile("config.json")
+	config.DumpConfig(app_config)
 
 	ss := NewHTTPStaticServer(app_config.StSrvConf)
 
@@ -151,7 +149,7 @@ func main() {
 
 	var hdlr http.Handler = ss
 
-	hdlr = accesslog.NewLoggingHandler(hdlr, logger)
+	hdlr = accesslog.NewLoggingHandler(hdlr, logger.GetLogger())
 
 	switch app_config.StSrvConf.Auth.Type {
 	case "http":
@@ -179,35 +177,36 @@ func main() {
 
 	mainRouter := mux.NewRouter()
 	router := mainRouter
+	mainRouter.HandleFunc("/-/sysinfo", func(w http.ResponseWriter, r *http.Request) {
+		data := versionMessage()
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+		w.Write([]byte(data))
+	})
 	if app_config.StSrvConf.Prefix != "" {
 		router = mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Subrouter()
-		mainRouter.Handle(app_config.StSrvConf.Prefix, hdlr)
+		// mainRouter.Handle(app_config.StSrvConf.Prefix, hdlr)
+		mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Handler(hdlr)
 		mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, app_config.StSrvConf.Prefix, http.StatusTemporaryRedirect)
 		})
+		router.PathPrefix("/-/assets/").Handler(http.StripPrefix(app_config.StSrvConf.Prefix+"/-/", http.FileServer(Assets)))
+	} else {
+		router.PathPrefix("/-/assets/").Handler(http.StripPrefix(app_config.StSrvConf.Prefix+"/-/", http.FileServer(Assets)))
+		router.PathPrefix("/").Handler(hdlr) // 坑：一般路由放后面
 	}
-
-	router.PathPrefix("/-/assets/").Handler(http.StripPrefix(app_config.StSrvConf.Prefix+"/-/", http.FileServer(Assets)))
-	router.HandleFunc("/-/sysinfo", func(w http.ResponseWriter, r *http.Request) {
-		data, _ := json.Marshal(map[string]interface{}{
-			"version": VERSION,
-		})
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
-		w.Write(data)
-	})
-	router.PathPrefix("/").Handler(hdlr)
 
 	// get local bind address
 	var local = app_config.Host
 	if local == "" {
 		local = getLocalIP()
 	}
-	log.Printf("local %s, address http://%s:%d\n", fmt.Sprintf("%s:%d", app_config.Host, app_config.Port), local, app_config.Port)
+	localBind := fmt.Sprintf("%s:%d", app_config.Host, app_config.Port)
+	log.Printf("local %s, address http://%s:%d\n", localBind, local, app_config.Port)
 
 	srv := &http.Server{
 		Handler: mainRouter,
-		Addr:    fmt.Sprintf("%s:%d", app_config.Host, app_config.Port),
+		Addr:    localBind,
 	}
 
 	var err error

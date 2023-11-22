@@ -19,9 +19,11 @@ import (
 
 	"regexp"
 
+	"static-server/config"
+	"static-server/files"
+
 	"github.com/go-yaml/yaml"
 	"github.com/gorilla/mux"
-	"static-server/files"
 )
 
 const YAMLCONF = ".ghs.yml"
@@ -37,7 +39,7 @@ type Directory struct {
 }
 
 type HTTPStaticServer struct {
-	Config StaticServerConfig
+	Config config.FileServiceConfig
 
 	fileTransformer files.FileTransformer
 	indexes         []IndexFileItem
@@ -45,7 +47,7 @@ type HTTPStaticServer struct {
 	bufPool         sync.Pool // use sync.Pool caching buf to reduce gc ratio
 }
 
-func NewHTTPStaticServer(conf StaticServerConfig) *HTTPStaticServer {
+func NewHTTPStaticServer(conf config.FileServiceConfig) *HTTPStaticServer {
 	if err := conf.CheckPrefix(); err != nil {
 		panic(err)
 	}
@@ -58,7 +60,7 @@ func NewHTTPStaticServer(conf StaticServerConfig) *HTTPStaticServer {
 
 	s := &HTTPStaticServer{
 		Config:          conf,
-		fileTransformer: files.CreateNewFileTransformer(conf.Root),
+		fileTransformer: files.CreateFileTransformer(conf.Prefix, conf.Root),
 		muxRouter:       router,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
@@ -96,6 +98,8 @@ func (s *HTTPStaticServer) getRealPath(r *http.Request) string {
 	path := mux.Vars(r)["path"]
 	mp, err := s.fileTransformer.TransformPath(path)
 	log.Printf("transform path {%s}  {%s} \n", mp, err)
+	rp, err := s.fileTransformer.IsolationPath(string(mp))
+	log.Printf("Isolation path {%s} {%s} {%s} \n", rp, path, err)
 
 	if !strings.HasPrefix(path, "/") {
 		path = "/" + path
@@ -282,15 +286,6 @@ func (s *HTTPStaticServer) hUploadOrMkdir(w http.ResponseWriter, req *http.Reque
 	})
 }
 
-type FileJSONInfo struct {
-	Name    string      `json:"name"`
-	Type    string      `json:"type"`
-	Size    int64       `json:"size"`
-	Path    string      `json:"path"`
-	ModTime int64       `json:"mtime"`
-	Extra   interface{} `json:"extra,omitempty"`
-}
-
 func (s *HTTPStaticServer) hInfo(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
 	relPath := s.getRealPath(r)
@@ -300,7 +295,7 @@ func (s *HTTPStaticServer) hInfo(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	fji := &FileJSONInfo{
+	fji := &files.FileInfo{
 		Name:    fi.Name(),
 		Size:    fi.Size(),
 		Path:    path,
@@ -594,7 +589,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			lr.Name = name
 			lr.Path = filepath.Join(filepath.Dir(path), name)
 			lr.Type = files.FILE_TYPE_DIR
-			lr.Size = s.historyDirSize(lr.Path)
+			lr.Size = s.historyDirSize(s.getRealPath(r))
 		} else {
 			lr.Type = "file"
 			lr.Size = info.Size() // formatSize(info)
@@ -625,7 +620,7 @@ func (s *HTTPStaticServer) makeIndex() error {
 			return nil
 		}
 
-		path, _ = filepath.Rel(s.Config.Root, path)
+		// path, _ = filepath.Rel(s.Config.Root, path)
 		path = filepath.ToSlash(path)
 		indexes = append(indexes, IndexFileItem{path, info})
 		return nil
@@ -755,6 +750,7 @@ func init() {
 		"title": strings.Title,
 		"urlhash": func(path string) string {
 			httpFile, err := Assets.Open(path)
+			log.Printf("assets open %s err %s\n", path, err)
 			if err != nil {
 				return path + "#no-such-file"
 			}
