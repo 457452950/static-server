@@ -85,7 +85,7 @@
     <div class="col-md-12">
       <ol class="breadcrumb">
         <li>
-          <a v-on:click='changePath("/", $event)' href="/"><i class="fa fa-home"></i></a>
+          <a v-on:click='changePath([[.Config.Prefix]], $event)' href="/"><i class="fa fa-home"></i></a>
         </li>
         <li v-for="bc in breadcrumb.slice(0, breadcrumb.length-1)">
           <a v-on:click='changePath(bc.path, $event)' href="{{bc.path}}">{{bc.name}}</a>
@@ -274,8 +274,8 @@
   <script src="[[.Config.Prefix]]/-/assets/js/underscore-min.js"></script>
   <script src="[[.Config.Prefix]]/-/assets/js/clipboard-1.5.12.min.js"></script>
   <script src="[[.Config.Prefix]]/-/assets/bootstrap-3.3.5/js/bootstrap.min.js"></script>
-  <script src='[[.Config.Prefix]]/-/assets/[["js/index.js" | urlhash ]]'></script>
-  <!-- <script src="[[.Config.Prefix]]/-/assets/js/index.js"></script> -->
+  <!-- <script src='[[.Config.Prefix]]/-/assets/[["js/index.js" | urlhash ]]'></script>   -->
+  <script src="[[.Config.Prefix]]/-/assets/js/index.js"></script>
   <!--Sync status bar color with border-color on mobile platforms.-->
   <script>
     var META = document.getElementsByTagName("meta");
