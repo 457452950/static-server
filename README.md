@@ -1,5 +1,5 @@
 # gohttpserver
-[![Docker Automated build](https://img.shields.io/docker/automated/codeskyblue/gohttpserver)](https://hub.docker.com/repository/docker/codeskyblue/gohttpserver)
+[![Docker Automated build](https://img.shields.io/docker/automated/457452950/static-server)](https://hub.docker.com/repository/docker/457452950/static-server)
 
 - Goal: Make the best HTTP File Server.
 - Features: Human-friendly UI, file uploading support, direct QR-code generation for Apple & Android install package.
@@ -9,7 +9,7 @@
 - 目标: 做最好的HTTP文件服务器
 - 功能: 人性化的UI体验，文件的上传支持，安卓和苹果安装包的二维码直接生成。
 
-**Binaries** can be downloaded from [this repo releases](https://github.com/codeskyblue/gohttpserver/releases/)
+**Binaries** can be downloaded from [this repo releases](https://github.com/457452950/static-server/releases/)
 
 ## Requirements
 Tested with go-1.16
@@ -58,10 +58,10 @@ Tested with go-1.16
 
 ## Installation
 ```bash
-$ go install github.com/codeskyblue/gohttpserver@latest
+$ go install github.com/457452950/static-server@latest
 ```
 
-Or download binaries from [github releases](https://github.com/codeskyblue/gohttpserver/releases)
+Or download binaries from [github releases](https://github.com/457452950/static-server/releases)
 
 If you are using Mac, simply run command
 
@@ -82,14 +82,14 @@ Use command `gohttpserver --help` to see more usage.
 share current directory
 
 ```bash
-$ docker run -it --rm -p 8000:8000 -v $PWD:/app/public --name gohttpserver codeskyblue/gohttpserver
+$ docker run -it --rm -p 8000:8000 -v $PWD:/app/public --name gohttpserver 457452950/static-server
 ```
 
 Share current directory with http basic auth
 
 ```bash
 $ docker run -it --rm -p 8000:8000 -v $PWD:/app/public --name gohttpserver \
-  codeskyblue/gohttpserver \
+  457452950/static-server \
   --auth-type http --auth-http username:password
 ```
 
@@ -97,7 +97,7 @@ Share current directory with openid auth. (Works only in netease company.)
 
 ```bash
 $ docker run -it --rm -p 8000:8000 -v $PWD:/app/public --name gohttpserver \
-  codeskyblue/gohttpserver \
+  457452950/static-server \
   --auth-type openid
 ```
 
@@ -159,13 +159,13 @@ Add access rule by creating a `.ghs.yml` file under a sub-directory. An example:
 upload: false
 delete: false
 users:
-- email: "codeskyblue@codeskyblue.com"
+- email: "457452950@457452950.com"
   delete: true
   upload: true
   token: 4567gf8asydhf293r23r
 ```
 
-In this case, if openid auth is enabled and user "codeskyblue@codeskyblue.com" has logged in, he/she can delete/upload files under the directory where the `.ghs.yml` file exits.
+In this case, if openid auth is enabled and user "457452950@457452950.com" has logged in, he/she can delete/upload files under the directory where the `.ghs.yml` file exits.
 
 `token` is used for upload. see [upload with curl](#upload-with-curl)
 
@@ -261,7 +261,7 @@ gohttpserver should started with `--xheaders` argument when behide nginx.
 
 Refs: <http://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size>
 
-gohttpserver also support `--prefix` flag which will help to when meet `/` is occupied by other service. relative issue <https://github.com/codeskyblue/gohttpserver/issues/105>
+gohttpserver also support `--prefix` flag which will help to when meet `/` is occupied by other service. relative issue <https://github.com/457452950/static-server/issues/105>
 
 Usage example:
 

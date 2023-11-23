@@ -11,4 +11,4 @@ this will produce this:
 | col 2 is      | *centered*    |   $12 |
 | zebra stripes | ~~are neat~~  |    $1 |
 
-https://github.com/codeskyblue/gohttpserver
+https://github.com/457452950/static-server
