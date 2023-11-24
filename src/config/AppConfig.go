@@ -81,8 +81,8 @@ type AppConfig struct {
 
 func GetDefaultConfig() (config AppConfig) {
 	config = AppConfig{
-		Host:     DefaultLocalHost,
-		Port:     DefaultLocalPort,
+		Host:     ConfigDefaultLocalHost,
+		Port:     ConfigDefaultLocalPort,
 		Httpauth: "",
 		SSL: Ssl{
 			Enable: false,
@@ -93,12 +93,12 @@ func GetDefaultConfig() (config AppConfig) {
 		XHeaders: false,
 		Debug:    false,
 		StSrvConf: FileServiceConfig{
-			Root:            DefaultRootDir,
-			Prefix:          DefaultPrefix,
+			Root:            ConfigDefaultRootDir,
+			Prefix:          ConfigDefaultPrefix,
 			Upload:          false,
 			Delete:          false,
 			Title:           "",
-			Theme:           DefaultTheme,
+			Theme:           ConfigDefaultTheme,
 			Plistproxy:      "",
 			GoogleTrackerID: "",
 			Auth: AuthInfo{

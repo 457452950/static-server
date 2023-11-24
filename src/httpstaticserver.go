@@ -551,6 +551,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			results = results[:50]
 		}
 		for _, item := range results {
+			// fixme: search功能
 			if filepath.HasPrefix(item.Path, requestPath) {
 				fileInfoMap[item.Path] = item.Info
 			}

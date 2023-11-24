@@ -1,16 +1,23 @@
 package service
 
 import (
+	"embed"
+	"fmt"
+	"log"
 	"net/http"
 	"static-server/config"
 	"static-server/logger"
 
 	"github.com/codeskyblue/go-accesslog"
 	"github.com/goji/httpauth"
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 )
 
 type Service struct {
 	appConfig config.AppConfig
+	service   *http.Server
+	assets    AssetsHandler
 }
 
 func CreateServer(conf config.AppConfig) (srv *Service) {
@@ -18,7 +25,13 @@ func CreateServer(conf config.AppConfig) (srv *Service) {
 		appConfig: conf,
 	}
 
-	fileServiceHandler := CreateFileStaticService(conf.StSrvConf)
+	return
+}
+
+func (srv *Service) Init(assets embed.FS) {
+	srv.assets.Set(assets)
+
+	fileServiceHandler := CreateFileStaticService(srv.appConfig.StSrvConf)
 
 	var handler http.Handler = fileServiceHandler
 
@@ -27,11 +40,25 @@ func CreateServer(conf config.AppConfig) (srv *Service) {
 	// init auth
 	handler = srv.SetAuthentication(handler)
 
-	return
-}
+	handler = srv.SetCORS(handler)
 
-func (srv *Service) Run() {
+	handler = srv.SetXHeaders(handler)
 
+	handler = srv.SetPrefixAndHandler(handler)
+
+	var localBinded = srv.GetLocalBinded()
+	log.Printf("%s\n", localBinded)
+
+	var local = srv.appConfig.Host
+	if local == "" {
+		local = getLocalIP()
+	}
+	log.Printf("address http://%s:%d\n", local, srv.appConfig.Port)
+
+	srv.service = &http.Server{
+		Handler: handler,
+		Addr:    localBinded,
+	}
 }
 
 func (srv *Service) InitHttpLogger(handler http.Handler) http.Handler {
@@ -59,4 +86,50 @@ func (srv *Service) SetAuthentication(handler http.Handler) http.Handler {
 	}
 
 	return handler
+}
+
+func (srv *Service) SetCORS(handler http.Handler) http.Handler {
+	if srv.appConfig.Cors {
+		return handlers.CORS()(handler)
+	}
+	return handler
+}
+
+func (srv *Service) SetXHeaders(handler http.Handler) http.Handler {
+	if srv.appConfig.XHeaders {
+		return handlers.ProxyHeaders(handler)
+	}
+	return handler
+}
+
+func (srv *Service) SetPrefixAndHandler(handler http.Handler) http.Handler {
+	mainRouter := mux.NewRouter()
+
+	// set sysinfo router
+	mainRouter.HandleFunc(config.PrefixSysInfo, handleSysInfo) // 路径不带有隐式通配符
+	mainRouter.PathPrefix(config.PrefixAssets).Handler(http.StripPrefix(config.PrefixSpecialSymbol, srv.assets.Get()))
+
+	if srv.appConfig.StSrvConf.Prefix != "" {
+		mainRouter.PathPrefix(srv.appConfig.StSrvConf.Prefix).Handler(handler)
+		// 重定向
+		mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, srv.appConfig.StSrvConf.Prefix, http.StatusTemporaryRedirect)
+		})
+	} else {
+		mainRouter.PathPrefix("/").Handler(handler)
+	}
+
+	return mainRouter
+}
+
+func (srv *Service) GetLocalBinded() string {
+	return fmt.Sprintf("%s:%d", srv.appConfig.Host, srv.appConfig.Port)
+}
+
+func (srv *Service) Run() error {
+	if srv.appConfig.SSL.Enable {
+		return srv.service.ListenAndServeTLS(srv.appConfig.SSL.Cert, srv.appConfig.SSL.Key)
+	} else {
+		return srv.service.ListenAndServe()
+	}
 }
