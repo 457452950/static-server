@@ -1,7 +1,6 @@
 package service
 
 import (
-	"embed"
 	"fmt"
 	"log"
 	"net/http"
@@ -29,10 +28,10 @@ func CreateServer(conf config.AppConfig) (srv *Service) {
 	return
 }
 
-func (srv *Service) Init(assets embed.FS) {
+func (srv *Service) Init(assets http.FileSystem) {
 	srv.assets.Set(assets)
 
-	fileServiceHandler := CreateFileStaticService(srv.appConfig.StSrvConf)
+	fileServiceHandler := createFileStaticService(srv.appConfig.StSrvConf, assets)
 
 	var handler http.Handler = fileServiceHandler
 
@@ -62,7 +61,7 @@ func (srv *Service) Init(assets embed.FS) {
 	}
 
 	if srv.appConfig.EnableSsl() {
-		localBinded := srv.GetLocalBinded()
+		localBinded := srv.GetTLSLocalBinded()
 		log.Printf("%s\n", localBinded)
 		log.Printf("address https://%s:%d\n", local, srv.appConfig.SSL.Port)
 		srv.tlsService = &http.Server{
@@ -142,7 +141,7 @@ func (srv *Service) GetTLSLocalBinded() string {
 }
 
 func (srv *Service) runSsl() {
-	err := srv.service.ListenAndServeTLS(srv.appConfig.SSL.Cert, srv.appConfig.SSL.Key)
+	err := srv.tlsService.ListenAndServeTLS(srv.appConfig.SSL.Cert, srv.appConfig.SSL.Key)
 	log.Println(err)
 }
 

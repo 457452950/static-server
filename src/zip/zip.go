@@ -1,4 +1,4 @@
-package main
+package zzip
 
 import (
 	"archive/zip"
@@ -17,6 +17,10 @@ import (
 	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
+var (
+	YAMLCONF = ".ghs.yml"
+)
+
 type Zip struct {
 	*zip.Writer
 }
@@ -26,7 +30,7 @@ func sanitizedName(filename string) string {
 		runtime.GOOS == "windows" {
 		filename = filename[2:]
 	}
-	filename = strings.TrimLeft(strings.Replace(filename, `\`, "/", -1), `/`)
+	filename = strings.TrimLeft(strings.Replace(filename, "\\", "/", -1), `/`)
 	filename = filepath.ToSlash(filename)
 	filename = filepath.Clean(filename)
 	return filename
@@ -132,7 +136,7 @@ func ExtractFromZip(zipFile, path string, w io.Writer) (err error) {
 	return fmt.Errorf("File %s not found", strconv.Quote(path))
 }
 
-func unzipFile(filename, dest string) error {
+func UnzipFile(filename, dest string) error {
 	zr, err := zip.OpenReader(filename)
 	if err != nil {
 		return err

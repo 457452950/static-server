@@ -1,49 +1,11 @@
 package main
 
 import (
-	"bytes"
-	"fmt"
 	"log"
-	"net/http"
-	"runtime"
-	"strings"
-	"text/template"
-
-	"github.com/codeskyblue/go-accesslog"
-	"github.com/goji/httpauth"
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 
 	"static-server/config"
-	"static-server/logger"
+	"static-server/service"
 )
-
-// type Configure struct {
-// 	Conf            *os.File `yaml:"-"`
-// 	Addr            string   `yaml:"addr"`
-// 	Port            int      `yaml:"port"`
-// 	Root            string   `yaml:"root"`
-// 	Prefix          string   `yaml:"prefix"`
-// 	HTTPAuth        string   `yaml:"httpauth"`
-// 	Cert            string   `yaml:"cert"`
-// 	Key             string   `yaml:"key"`
-// 	Cors            bool     `yaml:"cors"`
-// 	Theme           string   `yaml:"theme"`
-// 	XHeaders        bool     `yaml:"xheaders"`
-// 	Upload          bool     `yaml:"upload"`
-// 	Delete          bool     `yaml:"delete"`
-// 	PlistProxy      string   `yaml:"plistproxy"`
-// 	Title           string   `yaml:"title"`
-// 	Debug           bool     `yaml:"debug"`
-// 	GoogleTrackerID string   `yaml:"google-tracker-id"`
-// 	Auth            struct {
-// 		Type   string `yaml:"type"` // openid|http|github
-// 		OpenID string `yaml:"openid"`
-// 		HTTP   string `yaml:"http"`
-// 		ID     string `yaml:"id"`     // for oauth2
-// 		Secret string `yaml:"secret"` // for oauth2
-// 	} `yaml:"auth"`
-// }
 
 var (
 	// defaultPlistProxy = "https://plistproxy.herokuapp.com/plist"
@@ -55,26 +17,6 @@ var (
 	GITCOMMIT = "unknown git commit"
 	SITE      = "https://github.com/457452950/static-server"
 )
-
-func versionMessage() string {
-	t := template.Must(template.New("version").Parse(`GoHTTPServer
-  Version:        {{.Version}}
-  Go version:     {{.GoVersion}}
-  OS/Arch:        {{.OSArch}}
-  Git commit:     {{.GitCommit}}
-  Built:          {{.Built}}
-  Site:           {{.Site}}`))
-	buf := bytes.NewBuffer(nil)
-	t.Execute(buf, map[string]interface{}{
-		"Version":   VERSION,
-		"GoVersion": runtime.Version(),
-		"OSArch":    runtime.GOOS + "/" + runtime.GOARCH,
-		"GitCommit": GITCOMMIT,
-		"Built":     BUILDTIME,
-		"Site":      SITE,
-	})
-	return buf.String()
-}
 
 // func parseFlags() error {
 // 	// initial default conf
@@ -132,86 +74,92 @@ func main() {
 	app_config := config.LoadFromFile("config.json")
 	config.DumpConfig(app_config)
 
-	ss := NewHTTPStaticServer(app_config.StSrvConf)
+	server := service.CreateServer(app_config)
+	server.Init(Assets)
+	if err := server.Run(); err != nil {
+		log.Printf("%s\n", err)
+	}
 
-	// plist config
-	// if gcfg.PlistProxy != "" {
-	// 	u, err := url.Parse(gcfg.PlistProxy)
-	// 	if err != nil {
-	// 		log.Fatal(err)
+	// ss := NewHTTPStaticServer(app_config.StSrvConf)
+
+	// // plist config
+	// // if gcfg.PlistProxy != "" {
+	// // 	u, err := url.Parse(gcfg.PlistProxy)
+	// // 	if err != nil {
+	// // 		log.Fatal(err)
+	// // 	}
+	// // 	u.Scheme = "https"
+	// // 	ss.PlistProxy = u.String()
+	// // }
+	// // if ss.PlistProxy != "" {
+	// // 	log.Printf("plistproxy: %s", strconv.Quote(ss.PlistProxy))
+	// // }
+
+	// var hdlr http.Handler = ss
+
+	// hdlr = accesslog.NewLoggingHandler(hdlr, logger.GetLogger())
+
+	// switch app_config.StSrvConf.Auth.Type {
+	// case "http":
+	// 	// HTTP Basic Authentication
+	// 	userpass := strings.SplitN(app_config.StSrvConf.Auth.HTTP, ":", 2)
+	// 	if len(userpass) == 2 {
+	// 		user, pass := userpass[0], userpass[1]
+	// 		hdlr = httpauth.SimpleBasicAuth(user, pass)(hdlr)
 	// 	}
-	// 	u.Scheme = "https"
-	// 	ss.PlistProxy = u.String()
+	// case "openid":
+	// 	handleOpenID(app_config.StSrvConf.Auth.OpenID, false) // FIXME(ssx): set secure default to false
+	// 	// case "github":
+	// 	// 	handleOAuth2ID(gcfg.Auth.Type, gcfg.Auth.ID, gcfg.Auth.Secret) // FIXME(ssx): set secure default to false
+	// case "oauth2-proxy":
+	// 	handleOauth2()
 	// }
-	// if ss.PlistProxy != "" {
-	// 	log.Printf("plistproxy: %s", strconv.Quote(ss.PlistProxy))
+
+	// // CORS
+	// if app_config.Cors {
+	// 	hdlr = handlers.CORS()(hdlr)
+	// }
+	// if app_config.XHeaders {
+	// 	hdlr = handlers.ProxyHeaders(hdlr)
 	// }
 
-	var hdlr http.Handler = ss
+	// mainRouter := mux.NewRouter()
+	// mainRouter.HandleFunc("/-/sysinfo", func(w http.ResponseWriter, r *http.Request) {
+	// 	data := versionMessage()
+	// 	w.Header().Set("Content-Type", "application/json")
+	// 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
+	// 	w.Write([]byte(data))
+	// })
+	// mainRouter.PathPrefix("/-/assets/").Handler(http.StripPrefix("/-/", http.FileServer(Assets)))
+	// if app_config.StSrvConf.Prefix != "" {
+	// 	mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Subrouter()
+	// 	// mainRouter.Handle(app_config.StSrvConf.Prefix, hdlr)
+	// 	mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Handler(hdlr)
+	// 	mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+	// 		http.Redirect(w, r, app_config.StSrvConf.Prefix, http.StatusTemporaryRedirect)
+	// 	})
+	// } else {
+	// 	mainRouter.PathPrefix("/").Handler(hdlr) // 坑：一般路由放后面
+	// }
 
-	hdlr = accesslog.NewLoggingHandler(hdlr, logger.GetLogger())
+	// // get local bind address
+	// var local = app_config.Host
+	// if local == "" {
+	// 	local = getLocalIP()
+	// }
+	// localBind := fmt.Sprintf("%s:%d", app_config.Host, app_config.Port)
+	// log.Printf("local %s, address http://%s:%d\n", localBind, local, app_config.Port)
 
-	switch app_config.StSrvConf.Auth.Type {
-	case "http":
-		// HTTP Basic Authentication
-		userpass := strings.SplitN(app_config.StSrvConf.Auth.HTTP, ":", 2)
-		if len(userpass) == 2 {
-			user, pass := userpass[0], userpass[1]
-			hdlr = httpauth.SimpleBasicAuth(user, pass)(hdlr)
-		}
-	case "openid":
-		handleOpenID(app_config.StSrvConf.Auth.OpenID, false) // FIXME(ssx): set secure default to false
-		// case "github":
-		// 	handleOAuth2ID(gcfg.Auth.Type, gcfg.Auth.ID, gcfg.Auth.Secret) // FIXME(ssx): set secure default to false
-	case "oauth2-proxy":
-		handleOauth2()
-	}
+	// srv := &http.Server{
+	// 	Handler: mainRouter,
+	// 	Addr:    localBind,
+	// }
 
-	// CORS
-	if app_config.Cors {
-		hdlr = handlers.CORS()(hdlr)
-	}
-	if app_config.XHeaders {
-		hdlr = handlers.ProxyHeaders(hdlr)
-	}
-
-	mainRouter := mux.NewRouter()
-	mainRouter.HandleFunc("/-/sysinfo", func(w http.ResponseWriter, r *http.Request) {
-		data := versionMessage()
-		w.Header().Set("Content-Type", "application/json")
-		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
-		w.Write([]byte(data))
-	})
-	mainRouter.PathPrefix("/-/assets/").Handler(http.StripPrefix("/-/", http.FileServer(Assets)))
-	if app_config.StSrvConf.Prefix != "" {
-		mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Subrouter()
-		// mainRouter.Handle(app_config.StSrvConf.Prefix, hdlr)
-		mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Handler(hdlr)
-		mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-			http.Redirect(w, r, app_config.StSrvConf.Prefix, http.StatusTemporaryRedirect)
-		})
-	} else {
-		mainRouter.PathPrefix("/").Handler(hdlr) // 坑：一般路由放后面
-	}
-
-	// get local bind address
-	var local = app_config.Host
-	if local == "" {
-		local = getLocalIP()
-	}
-	localBind := fmt.Sprintf("%s:%d", app_config.Host, app_config.Port)
-	log.Printf("local %s, address http://%s:%d\n", localBind, local, app_config.Port)
-
-	srv := &http.Server{
-		Handler: mainRouter,
-		Addr:    localBind,
-	}
-
-	var err error
-	if app_config.EnableSsl() {
-		err = srv.ListenAndServeTLS(app_config.SSL.Cert, app_config.SSL.Key)
-	} else {
-		err = srv.ListenAndServe()
-	}
-	log.Fatal(err)
+	// var err error
+	// if app_config.EnableSsl() {
+	// 	err = srv.ListenAndServeTLS(app_config.SSL.Cert, app_config.SSL.Key)
+	// } else {
+	// 	err = srv.ListenAndServe()
+	// }
+	// log.Fatal(err)
 }

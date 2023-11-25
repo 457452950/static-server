@@ -6,7 +6,7 @@
         "enable" : true,
         "cert" : "cacert.pem",
         "key" : "privkey.pem",
-        "port" : 443
+        "port" : 8001
     },
     "cors" : false,
     "xheaders" : false,

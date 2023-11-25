@@ -20,4 +20,6 @@ var (
 	PrefixSpecialSymbol = "/-/"
 	PrefixSysInfo       = PrefixSpecialSymbol + "sysinfo"
 	PrefixAssets        = PrefixSpecialSymbol + "assets"
+
+	ConfigYamlFile = ".ghs.yml"
 )

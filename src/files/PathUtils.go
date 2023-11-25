@@ -12,15 +12,24 @@ func IsDir(path string) bool {
 	return err == nil && info.Mode().IsDir()
 }
 
+func IsFile(path string) bool {
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular()
+}
+
 type Path string
 
-func (p Path) join(path string) Path {
+func (p Path) Join(path string) Path {
 	return Path(filepath.Join(string(p), path))
 }
 
 func (p Path) IsExist() bool {
 	_, err := os.Stat(string(p))
 	return err == nil
+}
+
+func (p Path) Get() string {
+	return string(p)
 }
 
 type FileTransformer struct {
@@ -99,7 +108,7 @@ func (ftf FileTransformer) TransformPath(path string) (Path, error) {
 		return "", errors.New("invalid path")
 	}
 
-	localPath := ftf.basicPath.join(path)
+	localPath := ftf.basicPath.Join(path)
 	if !localPath.IsExist() {
 		return "", errors.New("file not found")
 	}

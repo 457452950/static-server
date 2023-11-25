@@ -18,5 +18,6 @@ require (
 	github.com/stretchr/testify v1.3.0
 	golang.org/x/net v0.0.0-20201021035429-f5854403a974 // indirect
 	golang.org/x/text v0.3.3
+	gopkg.in/yaml.v2 v2.2.1
 	howett.net/plist v0.0.0-20201203080718-1454fab16a06 // indirect
 )
