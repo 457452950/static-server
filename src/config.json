@@ -3,9 +3,10 @@
     "port" : 8000,
     "httpauth" : "",
     "ssl" : {
-        "enable" : false,
-        "cert" : "",
-        "key" : ""
+        "enable" : true,
+        "cert" : "cacert.pem",
+        "key" : "privkey.pem",
+        "port" : 443
     },
     "cors" : false,
     "xheaders" : false,

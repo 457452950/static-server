@@ -5,11 +5,12 @@ import (
 )
 
 var (
-	ConfigDefaultLocalHost = ""
-	ConfigDefaultLocalPort = 80
-	ConfigDefaultRootDir   = os.TempDir()
-	ConfigDefaultTheme     = "black"
-	ConfigDefaultPrefix    = ""
+	ConfigDefaultLocalHost          = ""
+	ConfigDefaultLocalPort    int16 = 80
+	ConfigDefaultLocalTLSPort int16 = 443
+	ConfigDefaultRootDir            = os.TempDir()
+	ConfigDefaultTheme              = "black"
+	ConfigDefaultPrefix             = ""
 
 	SysInfoVersion   = "unknown"
 	SysInfoBuildTime = "unknown time"

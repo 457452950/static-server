@@ -66,11 +66,12 @@ type Ssl struct {
 	Enable bool   `json:"enable"`
 	Cert   string `json:"cert"`
 	Key    string `json:"key"`
+	Port   int16  `json:"port"`
 }
 
 type AppConfig struct {
 	Host      string            `json:"host"`
-	Port      int               `json:"port"`
+	Port      int16             `json:"port"`
 	Httpauth  string            `json:"httpauth"`
 	SSL       Ssl               `json:"ssl"`
 	Cors      bool              `json:"cors"`
@@ -88,6 +89,7 @@ func GetDefaultConfig() (config AppConfig) {
 			Enable: false,
 			Cert:   "",
 			Key:    "",
+			Port:   ConfigDefaultLocalTLSPort,
 		},
 		Cors:     false,
 		XHeaders: false,
@@ -136,6 +138,17 @@ func LoadFromFile(file string) AppConfig {
 		return conf
 	}
 
+	if conf.StSrvConf.Root == "" {
+		conf.StSrvConf.Root = ConfigDefaultRootDir
+	}
+
+	if conf.Port == 0 {
+		conf.Port = ConfigDefaultLocalPort
+	}
+	if conf.SSL.Port == 0 {
+		conf.SSL.Port = ConfigDefaultLocalTLSPort
+	}
+
 	return conf
 }
 
@@ -174,4 +187,16 @@ func (conf *FileServiceConfig) CheckRoot() error {
 	}
 
 	return nil
+}
+
+func (conf AppConfig) EnableSsl() bool {
+	if !conf.SSL.Enable {
+		return false
+	}
+
+	if conf.SSL.Cert == "" || conf.SSL.Key == "" {
+		return false
+	}
+
+	return true
 }

@@ -15,9 +15,10 @@ import (
 )
 
 type Service struct {
-	appConfig config.AppConfig
-	service   *http.Server
-	assets    AssetsHandler
+	appConfig  config.AppConfig
+	service    *http.Server
+	tlsService *http.Server
+	assets     AssetsHandler
 }
 
 func CreateServer(conf config.AppConfig) (srv *Service) {
@@ -46,7 +47,7 @@ func (srv *Service) Init(assets embed.FS) {
 
 	handler = srv.SetPrefixAndHandler(handler)
 
-	var localBinded = srv.GetLocalBinded()
+	localBinded := srv.GetLocalBinded()
 	log.Printf("%s\n", localBinded)
 
 	var local = srv.appConfig.Host
@@ -58,6 +59,16 @@ func (srv *Service) Init(assets embed.FS) {
 	srv.service = &http.Server{
 		Handler: handler,
 		Addr:    localBinded,
+	}
+
+	if srv.appConfig.EnableSsl() {
+		localBinded := srv.GetLocalBinded()
+		log.Printf("%s\n", localBinded)
+		log.Printf("address https://%s:%d\n", local, srv.appConfig.SSL.Port)
+		srv.tlsService = &http.Server{
+			Handler: handler,
+			Addr:    localBinded,
+		}
 	}
 }
 
@@ -126,10 +137,18 @@ func (srv *Service) GetLocalBinded() string {
 	return fmt.Sprintf("%s:%d", srv.appConfig.Host, srv.appConfig.Port)
 }
 
+func (srv *Service) GetTLSLocalBinded() string {
+	return fmt.Sprintf("%s:%d", srv.appConfig.Host, srv.appConfig.SSL.Port)
+}
+
+func (srv *Service) runSsl() {
+	err := srv.service.ListenAndServeTLS(srv.appConfig.SSL.Cert, srv.appConfig.SSL.Key)
+	log.Println(err)
+}
+
 func (srv *Service) Run() error {
-	if srv.appConfig.SSL.Enable {
-		return srv.service.ListenAndServeTLS(srv.appConfig.SSL.Cert, srv.appConfig.SSL.Key)
-	} else {
-		return srv.service.ListenAndServe()
+	if srv.appConfig.EnableSsl() {
+		go srv.runSsl()
 	}
+	return srv.service.ListenAndServe()
 }

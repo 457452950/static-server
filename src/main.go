@@ -176,24 +176,22 @@ func main() {
 	}
 
 	mainRouter := mux.NewRouter()
-	router := mainRouter
 	mainRouter.HandleFunc("/-/sysinfo", func(w http.ResponseWriter, r *http.Request) {
 		data := versionMessage()
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data)))
 		w.Write([]byte(data))
 	})
+	mainRouter.PathPrefix("/-/assets/").Handler(http.StripPrefix("/-/", http.FileServer(Assets)))
 	if app_config.StSrvConf.Prefix != "" {
-		router = mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Subrouter()
+		mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Subrouter()
 		// mainRouter.Handle(app_config.StSrvConf.Prefix, hdlr)
 		mainRouter.PathPrefix(app_config.StSrvConf.Prefix).Handler(hdlr)
 		mainRouter.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 			http.Redirect(w, r, app_config.StSrvConf.Prefix, http.StatusTemporaryRedirect)
 		})
-		router.PathPrefix("/-/assets/").Handler(http.StripPrefix(app_config.StSrvConf.Prefix+"/-/", http.FileServer(Assets)))
 	} else {
-		router.PathPrefix("/-/assets/").Handler(http.StripPrefix(app_config.StSrvConf.Prefix+"/-/", http.FileServer(Assets)))
-		router.PathPrefix("/").Handler(hdlr) // 坑：一般路由放后面
+		mainRouter.PathPrefix("/").Handler(hdlr) // 坑：一般路由放后面
 	}
 
 	// get local bind address
@@ -210,7 +208,7 @@ func main() {
 	}
 
 	var err error
-	if app_config.SSL.Enable {
+	if app_config.EnableSsl() {
 		err = srv.ListenAndServeTLS(app_config.SSL.Cert, app_config.SSL.Key)
 	} else {
 		err = srv.ListenAndServe()

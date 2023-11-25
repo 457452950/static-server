@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"html/template"
 	"io"
 	"io/ioutil"
@@ -749,18 +748,18 @@ var (
 func init() {
 	funcMap = template.FuncMap{
 		"title": strings.Title,
-		"urlhash": func(path string) string {
-			httpFile, err := Assets.Open(path)
-			log.Printf("assets open %s err %s\n", path, err)
-			if err != nil {
-				return path + "#no-such-file"
-			}
-			info, err := httpFile.Stat()
-			if err != nil {
-				return path + "#stat-error"
-			}
-			return fmt.Sprintf("%s?t=%d", path, info.ModTime().Unix())
-		},
+		// "urlhash": func(path string) string {
+		// 	httpFile, err := Assets.Open(path)
+		// 	log.Printf("assets open %s err %s\n", path, err)
+		// 	if err != nil {
+		// 		return path + "#no-such-file"
+		// 	}
+		// 	info, err := httpFile.Stat()
+		// 	if err != nil {
+		// 		return path + "#stat-error"
+		// 	}
+		// 	return fmt.Sprintf("%s?t=%d", path, info.ModTime().Unix())
+		// },
 	}
 }
 
@@ -773,7 +772,7 @@ func renderHTML(w http.ResponseWriter, name string, v interface{}) {
 		t.Execute(w, v)
 		return
 	}
-	t := template.Must(template.New(name).Funcs(funcMap).Delims("[[", "]]").Parse(assetsContent(name)))
+	t := template.Must(template.New(name).Delims("[[", "]]").Parse(assetsContent(name)))
 	_tmpls[name] = t
 	t.Execute(w, v)
 }
