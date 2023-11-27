@@ -20,7 +20,7 @@ import (
 	"gopkg.in/yaml.v2"
 
 	"static-server/config"
-	"static-server/files"
+	"static-server/filesystem"
 	zzip "static-server/zip"
 )
 
@@ -33,7 +33,7 @@ type FileServiceHandler struct {
 	Config config.FileServiceConfig
 
 	assets          http.FileSystem
-	fileTransformer files.FileTransformer
+	fileTransformer filesystem.FileTransformer
 	indexes         []IndexFileItem
 	muxRouter       *mux.Router
 	bufPool         sync.Pool // use sync.Pool caching buf to reduce gc ratio
@@ -44,6 +44,9 @@ func (s *FileServiceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func createFileStaticService(conf config.FileServiceConfig, assets http.FileSystem) (handler *FileServiceHandler) {
+	ftree := filesystem.CreateFileTree(conf.Root)
+	log.Println(ftree)
+
 	if err := conf.CheckPrefix(); err != nil {
 		panic(err)
 	}
@@ -57,7 +60,7 @@ func createFileStaticService(conf config.FileServiceConfig, assets http.FileSyst
 	handler = &FileServiceHandler{
 		Config:          conf,
 		assets:          assets,
-		fileTransformer: files.CreateFileTransformer(conf.Prefix, conf.Root),
+		fileTransformer: filesystem.CreateFileTransformer(conf.Prefix, conf.Root),
 		muxRouter:       router,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
@@ -104,7 +107,7 @@ func (handler *FileServiceHandler) readAccessConf(realPath string) (ac AccessCon
 		parentPath := filepath.Dir(realPath)
 		ac = handler.readAccessConf(parentPath)
 	}
-	if files.IsFile(realPath) {
+	if filesystem.IsFile(realPath) {
 		realPath = filepath.Dir(realPath)
 	}
 	cfgFile := filepath.Join(realPath, config.ConfigYamlFile)
@@ -148,7 +151,7 @@ func (handler *FileServiceHandler) handleIndex(w http.ResponseWriter, r *http.Re
 	}
 
 	log.Println("GET", path, realPath)
-	if r.FormValue("raw") == "false" || files.IsDir(realPath.Get()) {
+	if r.FormValue("raw") == "false" || filesystem.IsDir(realPath.Get()) {
 		if r.Method == "HEAD" {
 			return
 		}
@@ -225,7 +228,7 @@ func (handler *FileServiceHandler) handleJsonList(w http.ResponseWriter, r *http
 			name := deepPath(realPath.Get(), info.Name())
 			lr.Name = name
 			lr.Path = filepath.Join(filepath.Dir(path), name)
-			lr.Type = files.FILE_TYPE_DIR
+			lr.Type = filesystem.FILE_TYPE_DIR
 			lr.Size = handler.historyDirSize(string(realPath.Join(name)))
 		} else {
 			lr.Type = "file"
@@ -251,7 +254,7 @@ func (handler *FileServiceHandler) hInfo(w http.ResponseWriter, r *http.Request)
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	fji := &files.FileInfo{
+	fji := &filesystem.FileInfo{
 		Name:    fi.Name(),
 		Size:    fi.Size(),
 		Path:    path,
@@ -259,15 +262,15 @@ func (handler *FileServiceHandler) hInfo(w http.ResponseWriter, r *http.Request)
 	}
 	ext := filepath.Ext(path)
 	switch ext {
-	case files.FILE_TYPE_MARKDOWN_SUFFIX:
-		fji.Type = files.FILE_TYPE_MARKDOWN
-	case files.FILE_TYPE_APK_SUFFIX:
-		fji.Type = files.FILE_TYPE_APK
-		fji.Extra = files.GetApkInfo(relPath.Get())
+	case filesystem.FILE_TYPE_MARKDOWN_SUFFIX:
+		fji.Type = filesystem.FILE_TYPE_MARKDOWN
+	case filesystem.FILE_TYPE_APK_SUFFIX:
+		fji.Type = filesystem.FILE_TYPE_APK
+		fji.Extra = filesystem.GetApkInfo(relPath.Get())
 	case "":
-		fji.Type = files.FILE_TYPE_DIR
+		fji.Type = filesystem.FILE_TYPE_DIR
 	default:
-		fji.Type = files.FILE_TYPE_TEXT
+		fji.Type = filesystem.FILE_TYPE_TEXT
 	}
 	data, _ := json.Marshal(fji)
 	w.Header().Set("Content-Type", "application/json")

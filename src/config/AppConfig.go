@@ -8,9 +8,8 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"static-server/filesystem"
 	"strings"
-
-	"static-server/files"
 )
 
 var (
@@ -181,7 +180,7 @@ func (conf *FileServiceConfig) CheckRoot() error {
 	}
 	log.Printf("local root path: %s\n", conf.Root)
 
-	ok := files.IsDir(conf.Root)
+	ok := filesystem.IsDir(conf.Root)
 	if !ok {
 		return errors.New("file not exist. ")
 	}

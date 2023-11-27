@@ -1,4 +1,4 @@
-package files
+package filesystem
 
 import (
 	"log"
@@ -45,6 +45,7 @@ func GetApkInfo(path string) (ai *ApkInfo) {
 	// load apk file
 	apkf, err := apk.OpenFile(path)
 	if err != nil {
+		log.Printf("%s\n", err)
 		return
 	}
 
