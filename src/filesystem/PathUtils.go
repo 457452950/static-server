@@ -58,7 +58,6 @@ func CreateFileTransformer(prefix string, basePath string) *FileTransformer {
 		prefix:    prefix,
 		basicPath: Path(basePath),
 	}
-	fTrans = ftf
 	return ftf
 }
 

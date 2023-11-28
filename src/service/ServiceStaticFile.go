@@ -324,6 +324,7 @@ func (handler *FileServiceHandler) handleUploadOrMkdir(w http.ResponseWriter, re
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	handler.fileTree.AddFile(dstPath.Get())
 
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 

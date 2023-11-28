@@ -9,8 +9,7 @@ import (
 )
 
 var (
-	ftree  *FileTree
-	fTrans *FileTransformer
+	ftree *FileTree
 )
 
 type FileNode struct {
@@ -57,6 +56,7 @@ func (fn *FileNode) addDir(path []string) {
 			ParentPath: fn.GetName(),
 			FileInfo:   fi,
 			SubFiles:   map[string]*FileNode{},
+			Parent:     fn,
 		}
 		// append to cache
 		ftree.Files[path[0]] = append(ftree.Files[path[0]], fn.SubFiles[path[0]])
@@ -76,10 +76,11 @@ func (fn *FileNode) addFile(path []string, fileName string) int64 {
 			ParentPath: fn.GetName(),
 			FileInfo:   finfo,
 			Size:       finfo.Size(),
+			Parent:     fn,
 		}
 
 		// add to cache
-		ftree.Files[fileName] = append(ftree.Files[fileName], fn)
+		ftree.Files[fileName] = append(ftree.Files[fileName], fnn)
 		// add to this dir
 		fn.SubFiles[fileName] = fnn
 		fn.Size += fnn.Size
@@ -104,7 +105,7 @@ func (fn *FileNode) rmFile(localFileName string) int64 {
 		cur = cur.Parent
 	}
 
-	fn.Parent.SubFiles[localFileName] = nil
+	delete(fn.Parent.SubFiles, localFileName)
 
 	return size
 }
