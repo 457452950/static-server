@@ -236,13 +236,17 @@ func (ft *FileTree) RmFile(localFile string) {
 }
 
 //
-func (ft *FileTree) SearchFile(localFileName string) []*FileNode {
+func (ft *FileTree) SearchFile(localFileName string, localPath string) []*FileNode {
 	var files = make([]*FileNode, 0)
 
 	ft.mutex.RLock()
 	defer ft.mutex.RUnlock()
 
-	files = append(files, ft.Files[localFileName]...)
+	for _, v := range ft.Files[localFileName] {
+		if strings.HasPrefix(v.GetName(), localPath) {
+			files = append(files, v)
+		}
+	}
 
 	return files
 }

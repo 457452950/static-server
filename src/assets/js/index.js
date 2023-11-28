@@ -252,7 +252,7 @@ var vm = new Vue({
     showInfo: function (f) {
       console.log("show info : ", f);
       $.ajax({
-        url: f.path,
+        url: "/" + f.path,
         data: {
           op: "info",
         },

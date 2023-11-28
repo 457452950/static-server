@@ -228,7 +228,7 @@ func (handler *FileServiceHandler) handleJsonList(w http.ResponseWriter, r *http
 	var fileList []FileInfo
 
 	if search != "" {
-		handle := handler.fileTree.SearchFile(search)
+		handle := handler.fileTree.SearchFile(search, realPath.Get())
 		fileList = handler.GetFilesInfo(handle)
 		println(fileList)
 
@@ -285,7 +285,12 @@ func (handler *FileServiceHandler) handleDelete(w http.ResponseWriter, req *http
 	path := mux.Vars(req)["path"]
 	log.Printf("delete path {%s}.\n", path)
 
-	realPath, _ := handler.fileTransformer.TransformPath(path)
+	realPath, err := handler.fileTransformer.TransformPath(path)
+	if err != nil {
+		w.WriteHeader(http.StatusNotFound)
+		return
+	}
+
 	// path = filepath.Clean(path) // for safe reason, prevent path contain ..
 	auth := handler.readAccessConf(realPath.Get())
 	if !auth.canDelete(req) {
@@ -293,8 +298,10 @@ func (handler *FileServiceHandler) handleDelete(w http.ResponseWriter, req *http
 		return
 	}
 
+	handler.fileTree.RmFile(realPath.Get())
+
 	// TODO: path safe check
-	err := os.RemoveAll(realPath.Get())
+	err = os.RemoveAll(realPath.Get())
 	if err != nil {
 		pathErr, ok := err.(*os.PathError)
 		if ok {
@@ -328,6 +335,7 @@ func (handler *FileServiceHandler) handleUploadOrMkdir(w http.ResponseWriter, re
 			http.Error(w, "Directory create "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// handler.fileTree.AddDir(dirpath.Get())
 	}
 
 	if file == nil { // only mkdir
