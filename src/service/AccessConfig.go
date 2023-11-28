@@ -1,8 +1,16 @@
 package service
 
 import (
+	"io/ioutil"
+	"log"
 	"net/http"
+	"os"
+	"path/filepath"
 	"regexp"
+	"static-server/config"
+	"static-server/filesystem"
+
+	"gopkg.in/yaml.v2"
 )
 
 type AccessTable struct {
@@ -93,4 +101,39 @@ func (c *AccessConf) canUpload(r *http.Request) bool {
 		}
 	}
 	return c.Upload
+}
+
+func (handler *FileServiceHandler) defaultAccessConf() AccessConf {
+	return AccessConf{
+		Upload: handler.Config.Upload,
+		Delete: handler.Config.Delete,
+	}
+}
+
+// localPath 绝对路径
+func (handler *FileServiceHandler) readAccessConf(localPath string) (ac AccessConf) {
+	relativePath, err := filepath.Rel(handler.Config.Root, localPath)
+	if err != nil || relativePath == "." || relativePath == "" { // actually relativePath is always "." if root == realPath
+		ac = handler.defaultAccessConf()
+		localPath = handler.Config.Root
+	} else {
+		parentPath := filepath.Dir(localPath)
+		ac = handler.readAccessConf(parentPath)
+	}
+	if filesystem.IsFile(localPath) {
+		localPath = filepath.Dir(localPath)
+	}
+	cfgFile := filepath.Join(localPath, config.ConfigYamlFile)
+	data, err := ioutil.ReadFile(cfgFile)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return
+		}
+		log.Printf("Err read .ghs.yml: %v", err)
+	}
+	err = yaml.Unmarshal(data, &ac)
+	if err != nil {
+		log.Printf("Err format .ghs.yml: %v", err)
+	}
+	return
 }

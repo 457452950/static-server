@@ -13,16 +13,8 @@ var (
 	FILE_TYPE_APK_SUFFIX      string = ".apk"
 	FILE_TYPE_TEXT            string = "text"
 	FILE_TYPE_DIR             string = "dir"
+	FILE_TYPE_FILE            string = "file"
 )
-
-type FileInfo struct {
-	Name    string      `json:"name"`
-	Type    string      `json:"type"`
-	Size    int64       `json:"size"`
-	Path    string      `json:"path"`
-	ModTime int64       `json:"mtime"`
-	Extra   interface{} `json:"extra,omitempty"`
-}
 
 type ApkInfo struct {
 	PackageName  string `json:"packageName"`

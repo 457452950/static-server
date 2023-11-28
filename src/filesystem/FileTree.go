@@ -9,7 +9,8 @@ import (
 )
 
 var (
-	ftree *FileTree
+	ftree  *FileTree
+	fTrans *FileTransformer
 )
 
 type FileNode struct {
@@ -22,6 +23,22 @@ type FileNode struct {
 
 func (fn FileNode) GetName() string {
 	return fn.Path + "/" + fn.FileInfo.Name()
+}
+
+func (fn FileNode) GetFileType() string {
+	if fn.FileInfo.IsDir() {
+		return FILE_TYPE_DIR
+	}
+
+	ext := filepath.Ext(fn.FileInfo.Name())
+	switch ext {
+	case FILE_TYPE_MARKDOWN_SUFFIX:
+		return FILE_TYPE_MARKDOWN
+	case FILE_TYPE_APK_SUFFIX:
+		return FILE_TYPE_APK
+	default:
+		return FILE_TYPE_TEXT
+	}
 }
 
 // 从根向子叶递归
@@ -37,7 +54,7 @@ func (fn *FileNode) addDir(path []string) {
 
 	fn.SubFiles[path[0]] = &FileNode{
 		Path:     fn.Path,
-		FileInfo: GetFileInfo(fn.Path + "/" + path[0]),
+		FileInfo: fi,
 		SubFiles: map[string]*FileNode{},
 	}
 	// append to cache
@@ -55,8 +72,8 @@ func (fn *FileNode) addFile(path []string, fileName string) int64 {
 		// make file node
 		fnn := &FileNode{
 			Path:     fn.Path,
-			Size:     finfo.Size(),
 			FileInfo: finfo,
+			Size:     finfo.Size(),
 		}
 
 		// add to cache
@@ -76,7 +93,7 @@ func (fn *FileNode) addFile(path []string, fileName string) int64 {
 }
 
 // 从子叶向根
-func (fn *FileNode) rmFile(fileName string) int64 {
+func (fn *FileNode) rmFile(localFileName string) int64 {
 	size := fn.Size
 
 	cur := fn
@@ -85,7 +102,7 @@ func (fn *FileNode) rmFile(fileName string) int64 {
 		cur = cur.Parent
 	}
 
-	fn.Parent.SubFiles[fileName] = nil
+	fn.Parent.SubFiles[localFileName] = nil
 
 	return size
 }
@@ -97,20 +114,20 @@ type FileTree struct {
 	mutex sync.RWMutex
 }
 
-func CreateFileTree(path string) *FileTree {
-	if !filepath.IsAbs(path) {
+func CreateFileTree(localPath string) *FileTree {
+	if !filepath.IsAbs(localPath) {
 		var err error
-		path, err = filepath.Abs(path)
+		localPath, err = filepath.Abs(localPath)
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	tree := &FileTree{
-		Path: path,
+		Path: localPath,
 		Root: &FileNode{
-			Path:     filepath.Dir(path),
-			FileInfo: GetFileInfo(path),
+			Path:     filepath.Dir(localPath),
+			FileInfo: GetFileInfo(localPath),
 		},
 		Files: make(map[string][]*FileNode),
 	}
@@ -149,19 +166,19 @@ func (fn *FileNode) walk() int64 {
 }
 
 // 从根向子叶递归
-func (ft *FileTree) AddDir(path string) {
+func (ft *FileTree) AddDir(localPath string) {
 	ft.mutex.Lock()
 	defer ft.mutex.Unlock()
 
-	if Path(path).IsExist() {
-		log.Printf("file %s not exist", path)
+	if Path(localPath).IsExist() {
+		log.Printf("file %s not exist", localPath)
 		return
 	}
 
 	// trans to abs path
-	path = GetAbsPath(path)
+	localPath = GetAbsPath(localPath)
 
-	file, err := filepath.Rel(ft.Path, path)
+	file, err := filepath.Rel(ft.Path, localPath)
 	if err != nil {
 		log.Printf("file %s trans to abs failed %s", file, err)
 		return
@@ -175,56 +192,69 @@ func (ft *FileTree) AddDir(path string) {
 }
 
 // 从根向子叶递归
-func (ft *FileTree) AddFile(file string) {
+func (ft *FileTree) AddFile(localFile string) {
 	ft.mutex.Lock()
 	defer ft.mutex.Unlock()
 
-	if Path(file).IsExist() {
-		log.Printf("file %s not exist", file)
+	if Path(localFile).IsExist() {
+		log.Printf("file %s not exist", localFile)
 		return
 	}
 
 	// trans to abs path
-	file = GetAbsPath(file)
+	localFile = GetAbsPath(localFile)
 
-	file, err := filepath.Rel(ft.Path, file)
+	localFile, err := filepath.Rel(ft.Path, localFile)
 	if err != nil {
-		log.Printf("file %s trans to abs failed %s", file, err)
+		log.Printf("file %s trans to abs failed %s", localFile, err)
 		return
 	}
 
 	// get path
-	paths := strings.Split(file, "/")
+	paths := strings.Split(localFile, "/")
 	print(paths)
 
 	ft.Root.addFile(paths[:len(paths)-1], paths[len(paths)-1])
 }
 
-func (ft *FileTree) RmFile(file string) {
+func (ft *FileTree) RmFile(localFile string) {
 	ft.mutex.Lock()
 	defer ft.mutex.Unlock()
 
 	// trans to abs path
-	file = GetAbsPath(file)
+	localFile = GetAbsPath(localFile)
 
 	// get path
-	fileName := filepath.Base(file)
+	fileName := filepath.Base(localFile)
 
 	for _, v := range ft.Files[fileName] {
-		if v.GetName() == file {
-			log.Printf("%s\n", file)
+		if v.GetName() == localFile {
+			log.Printf("%s\n", localFile)
 			v.rmFile(fileName)
 		}
 	}
 }
 
-func (ft *FileTree) SearchFile(fileName string) []*FileNode {
+//
+func (ft *FileTree) SearchFile(localFileName string) []*FileNode {
 	var files = make([]*FileNode, 0)
 
 	ft.mutex.RLock()
 	defer ft.mutex.RUnlock()
 
-	files = append(files, ft.Files[fileName]...)
+	files = append(files, ft.Files[localFileName]...)
 
 	return files
+}
+
+func (ft *FileTree) GetFile(localFileName string) *FileNode {
+	ft.mutex.RLock()
+	defer ft.mutex.RUnlock()
+
+	for _, v := range ft.Files[filepath.Base(localFileName)] {
+		if v.GetName() == localFileName {
+			return v
+		}
+	}
+	return nil
 }

@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
-	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -17,7 +16,6 @@ import (
 	"time"
 
 	"github.com/gorilla/mux"
-	"gopkg.in/yaml.v2"
 
 	"static-server/config"
 	"static-server/filesystem"
@@ -33,7 +31,8 @@ type FileServiceHandler struct {
 	Config config.FileServiceConfig
 
 	assets          http.FileSystem
-	fileTransformer filesystem.FileTransformer
+	fileTransformer *filesystem.FileTransformer
+	fileTree        *filesystem.FileTree
 	indexes         []IndexFileItem
 	muxRouter       *mux.Router
 	bufPool         sync.Pool // use sync.Pool caching buf to reduce gc ratio
@@ -44,8 +43,8 @@ func (s *FileServiceHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func createFileStaticService(conf config.FileServiceConfig, assets http.FileSystem) (handler *FileServiceHandler) {
-	ftree := filesystem.CreateFileTree(conf.Root)
-	log.Println(ftree)
+	fileTree := filesystem.CreateFileTree(conf.Root)
+	log.Println(fileTree)
 
 	if err := conf.CheckPrefix(); err != nil {
 		panic(err)
@@ -61,6 +60,7 @@ func createFileStaticService(conf config.FileServiceConfig, assets http.FileSyst
 		Config:          conf,
 		assets:          assets,
 		fileTransformer: filesystem.CreateFileTransformer(conf.Prefix, conf.Root),
+		fileTree:        fileTree,
 		muxRouter:       router,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
@@ -88,40 +88,6 @@ func createFileStaticService(conf config.FileServiceConfig, assets http.FileSyst
 	router.HandleFunc("/{path:.*}", handler.handleUploadOrMkdir).Methods("POST")
 	router.HandleFunc("/{path:.*}", handler.handleDelete).Methods("DELETE")
 
-	return
-}
-
-func (handler *FileServiceHandler) defaultAccessConf() AccessConf {
-	return AccessConf{
-		Upload: handler.Config.Upload,
-		Delete: handler.Config.Delete,
-	}
-}
-
-func (handler *FileServiceHandler) readAccessConf(realPath string) (ac AccessConf) {
-	relativePath, err := filepath.Rel(handler.Config.Root, realPath)
-	if err != nil || relativePath == "." || relativePath == "" { // actually relativePath is always "." if root == realPath
-		ac = handler.defaultAccessConf()
-		realPath = handler.Config.Root
-	} else {
-		parentPath := filepath.Dir(realPath)
-		ac = handler.readAccessConf(parentPath)
-	}
-	if filesystem.IsFile(realPath) {
-		realPath = filepath.Dir(realPath)
-	}
-	cfgFile := filepath.Join(realPath, config.ConfigYamlFile)
-	data, err := ioutil.ReadFile(cfgFile)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return
-		}
-		log.Printf("Err read .ghs.yml: %v", err)
-	}
-	err = yaml.Unmarshal(data, &ac)
-	if err != nil {
-		log.Printf("Err format .ghs.yml: %v", err)
-	}
 	return
 }
 
@@ -171,76 +137,112 @@ func (handler *FileServiceHandler) handleIndex(w http.ResponseWriter, r *http.Re
 	}
 }
 
+// func (handler *FileServiceHandler) handleJsonList(w http.ResponseWriter, r *http.Request) {
+// 	requestPath := mux.Vars(r)["path"]
+// 	log.Printf("handleJsonList request path {%s}.\n", requestPath)
+
+// 	realPath, _ := handler.fileTransformer.TransformPath(requestPath)
+// 	search := r.FormValue("search")
+// 	auth := handler.readAccessConf(realPath.Get())
+// 	auth.Upload = auth.canUpload(r)
+// 	auth.Delete = auth.canDelete(r)
+
+// 	finfo := handler.fileTree.GetFile(realPath.Get())
+// 	println(finfo)
+
+// 	// path string -> info os.FileInfo
+// 	fileInfoMap := make(map[string]os.FileInfo, 0)
+
+// 	if search != "" {
+// 		results := handler.findIndex(search)
+// 		if len(results) > 50 { // max 50
+// 			results = results[:50]
+// 		}
+// 		for _, item := range results {
+// 			// fixme: search功能
+// 			if filepath.HasPrefix(item.Path, requestPath) {
+// 				fileInfoMap[item.Path] = item.Info
+// 			}
+// 		}
+// 	} else {
+// 		infos, err := ioutil.ReadDir(realPath.Get())
+// 		if err != nil {
+// 			http.Error(w, err.Error(), 500)
+// 			return
+// 		}
+// 		for _, info := range infos {
+// 			fileInfoMap[filepath.Join(requestPath, info.Name())] = info
+// 		}
+// 	}
+
+// 	// turn file list -> json
+// 	lrs := make([]HTTPFileInfo, 0)
+// 	for path, info := range fileInfoMap {
+// 		if !auth.canAccess(info.Name()) {
+// 			continue
+// 		}
+// 		lr := HTTPFileInfo{
+// 			Name:    info.Name(),
+// 			Path:    path,
+// 			ModTime: info.ModTime().UnixNano() / 1e6,
+// 		}
+// 		if search != "" {
+// 			name, err := filepath.Rel(requestPath, path)
+// 			if err != nil {
+// 				log.Println(requestPath, path, err)
+// 			}
+// 			lr.Name = filepath.ToSlash(name) // fix for windows
+// 		}
+// 		if info.IsDir() {
+// 			name := deepPath(realPath.Get(), info.Name())
+// 			lr.Name = name
+// 			lr.Path = filepath.Join(filepath.Dir(path), name)
+// 			lr.Type = filesystem.FILE_TYPE_DIR
+// 			lr.Size = handler.historyDirSize(string(realPath.Join(name)))
+// 		} else {
+// 			lr.Type = "file"
+// 			lr.Size = info.Size() // formatSize(info)
+// 		}
+// 		lrs = append(lrs, lr)
+// 	}
+
+// 	data, _ := json.Marshal(map[string]interface{}{
+// 		"files": lrs,
+// 		"auth":  auth,
+// 	})
+// 	w.Header().Set("Content-Type", "application/json")
+// 	w.Write(data)
+// }
+
 func (handler *FileServiceHandler) handleJsonList(w http.ResponseWriter, r *http.Request) {
 	requestPath := mux.Vars(r)["path"]
+	search := r.FormValue("search")
 	log.Printf("handleJsonList request path {%s}.\n", requestPath)
 
 	realPath, _ := handler.fileTransformer.TransformPath(requestPath)
-	search := r.FormValue("search")
+
 	auth := handler.readAccessConf(realPath.Get())
 	auth.Upload = auth.canUpload(r)
 	auth.Delete = auth.canDelete(r)
 
-	// path string -> info os.FileInfo
-	fileInfoMap := make(map[string]os.FileInfo, 0)
+	var fileList []FileInfo
 
 	if search != "" {
-		results := handler.findIndex(search)
-		if len(results) > 50 { // max 50
-			results = results[:50]
-		}
-		for _, item := range results {
-			// fixme: search功能
-			if filepath.HasPrefix(item.Path, requestPath) {
-				fileInfoMap[item.Path] = item.Info
-			}
-		}
+		handle := handler.fileTree.SearchFile(search)
+		fileList = handler.GetFilesInfo(handle)
+		println(fileList)
+
 	} else {
-		infos, err := ioutil.ReadDir(realPath.Get())
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		for _, info := range infos {
-			fileInfoMap[filepath.Join(requestPath, info.Name())] = info
-		}
+		handle := handler.fileTree.GetFile(realPath.Get())
+		fileList = handler.GetSubsFileInfo(handle)
+		println(fileList)
 	}
 
-	// turn file list -> json
-	lrs := make([]HTTPFileInfo, 0)
-	for path, info := range fileInfoMap {
-		if !auth.canAccess(info.Name()) {
-			continue
-		}
-		lr := HTTPFileInfo{
-			Name:    info.Name(),
-			Path:    path,
-			ModTime: info.ModTime().UnixNano() / 1e6,
-		}
-		if search != "" {
-			name, err := filepath.Rel(requestPath, path)
-			if err != nil {
-				log.Println(requestPath, path, err)
-			}
-			lr.Name = filepath.ToSlash(name) // fix for windows
-		}
-		if info.IsDir() {
-			name := deepPath(realPath.Get(), info.Name())
-			lr.Name = name
-			lr.Path = filepath.Join(filepath.Dir(path), name)
-			lr.Type = filesystem.FILE_TYPE_DIR
-			lr.Size = handler.historyDirSize(string(realPath.Join(name)))
-		} else {
-			lr.Type = "file"
-			lr.Size = info.Size() // formatSize(info)
-		}
-		lrs = append(lrs, lr)
-	}
-
-	data, _ := json.Marshal(map[string]interface{}{
-		"files": lrs,
-		"auth":  auth,
-	})
+	data, _ := json.Marshal(
+		ResFilesList{
+			Files:  fileList,
+			Access: auth,
+		})
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
 }
@@ -248,13 +250,15 @@ func (handler *FileServiceHandler) handleJsonList(w http.ResponseWriter, r *http
 func (handler *FileServiceHandler) hInfo(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
 	relPath, _ := handler.fileTransformer.TransformPath(path)
+	finfo := handler.fileTree.GetFile(relPath.Get())
+	log.Println(finfo)
 
 	fi, err := os.Stat(relPath.Get())
 	if err != nil {
 		http.Error(w, err.Error(), 500)
 		return
 	}
-	fji := &filesystem.FileInfo{
+	fji := &FileDetail{
 		Name:    fi.Name(),
 		Size:    fi.Size(),
 		Path:    path,
@@ -491,7 +495,10 @@ type Directory struct {
 	mutex *sync.RWMutex
 }
 
-var dirInfoSize = Directory{size: make(map[string]int64), mutex: &sync.RWMutex{}}
+var dirInfoSize = Directory{
+	size:  make(map[string]int64),
+	mutex: &sync.RWMutex{},
+}
 
 func (handler *FileServiceHandler) historyDirSize(dir string) int64 {
 	dirInfoSize.mutex.RLock()
@@ -541,24 +548,4 @@ func (handler *FileServiceHandler) makeIndex() error {
 	})
 	handler.indexes = indexes
 	return err
-}
-
-func (handler *FileServiceHandler) hZip(w http.ResponseWriter, r *http.Request) {
-	path := mux.Vars(r)["path"]
-	realPath, _ := handler.fileTransformer.TransformPath(path)
-	zzip.CompressToZip(w, realPath.Get())
-}
-
-func (handler *FileServiceHandler) hUnzip(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	zipPath, path := vars["zip_path"], vars["path"]
-	ctype := mime.TypeByExtension(filepath.Ext(path))
-	if ctype != "" {
-		w.Header().Set("Content-Type", ctype)
-	}
-	err := zzip.ExtractFromZip(filepath.Join(handler.Config.Root, zipPath), path, w)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
 }

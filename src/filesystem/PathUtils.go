@@ -41,7 +41,7 @@ func (ftf FileTransformer) GetBasePath() Path {
 	return ftf.basicPath
 }
 
-func CreateFileTransformer(prefix string, basePath string) FileTransformer {
+func CreateFileTransformer(prefix string, basePath string) *FileTransformer {
 	if !IsDir(basePath) {
 		panic("base path is not a dir.")
 	}
@@ -54,15 +54,16 @@ func CreateFileTransformer(prefix string, basePath string) FileTransformer {
 		}
 	}
 
-	ftf := FileTransformer{
+	ftf := &FileTransformer{
 		prefix:    prefix,
 		basicPath: Path(basePath),
 	}
+	fTrans = ftf
 	return ftf
 }
 
 // IsolationPath local path to string, Hide the local directory
-func (ftf FileTransformer) IsolationPath(path string) (string, error) {
+func (ftf FileTransformer) IsolationPath(path string) string {
 	if strings.HasPrefix(path, "..") {
 		panic("invalid path")
 	}
@@ -71,20 +72,20 @@ func (ftf FileTransformer) IsolationPath(path string) (string, error) {
 	if filepath.IsAbs(path) {
 		path, err = filepath.Abs(path)
 		if err != nil {
-			return "", err
+			panic(err)
 		}
 	}
 
 	path, err = filepath.Rel(string(ftf.basicPath), path)
 	if err != nil {
-		return "", err
+		panic(err)
 	}
 
 	path = filepath.Join(ftf.prefix, path)
 
 	path = strings.TrimPrefix(path, "/")
 
-	return path, nil
+	return path
 }
 
 // TransformPath transform the string to local directory

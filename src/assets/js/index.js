@@ -250,9 +250,9 @@ var vm = new Vue({
       e.preventDefault()
     },
     showInfo: function (f) {
-      console.log(f);
+      console.log("show info : ", f);
       $.ajax({
-        url: this.getEncodePath(f.name),
+        url: f.path,
         data: {
           op: "info",
         },
