@@ -137,93 +137,20 @@ func (handler *FileServiceHandler) handleIndex(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// func (handler *FileServiceHandler) handleJsonList(w http.ResponseWriter, r *http.Request) {
-// 	requestPath := mux.Vars(r)["path"]
-// 	log.Printf("handleJsonList request path {%s}.\n", requestPath)
-
-// 	realPath, _ := handler.fileTransformer.TransformPath(requestPath)
-// 	search := r.FormValue("search")
-// 	auth := handler.readAccessConf(realPath.Get())
-// 	auth.Upload = auth.canUpload(r)
-// 	auth.Delete = auth.canDelete(r)
-
-// 	finfo := handler.fileTree.GetFile(realPath.Get())
-// 	println(finfo)
-
-// 	// path string -> info os.FileInfo
-// 	fileInfoMap := make(map[string]os.FileInfo, 0)
-
-// 	if search != "" {
-// 		results := handler.findIndex(search)
-// 		if len(results) > 50 { // max 50
-// 			results = results[:50]
-// 		}
-// 		for _, item := range results {
-// 			// fixme: search功能
-// 			if filepath.HasPrefix(item.Path, requestPath) {
-// 				fileInfoMap[item.Path] = item.Info
-// 			}
-// 		}
-// 	} else {
-// 		infos, err := ioutil.ReadDir(realPath.Get())
-// 		if err != nil {
-// 			http.Error(w, err.Error(), 500)
-// 			return
-// 		}
-// 		for _, info := range infos {
-// 			fileInfoMap[filepath.Join(requestPath, info.Name())] = info
-// 		}
-// 	}
-
-// 	// turn file list -> json
-// 	lrs := make([]HTTPFileInfo, 0)
-// 	for path, info := range fileInfoMap {
-// 		if !auth.canAccess(info.Name()) {
-// 			continue
-// 		}
-// 		lr := HTTPFileInfo{
-// 			Name:    info.Name(),
-// 			Path:    path,
-// 			ModTime: info.ModTime().UnixNano() / 1e6,
-// 		}
-// 		if search != "" {
-// 			name, err := filepath.Rel(requestPath, path)
-// 			if err != nil {
-// 				log.Println(requestPath, path, err)
-// 			}
-// 			lr.Name = filepath.ToSlash(name) // fix for windows
-// 		}
-// 		if info.IsDir() {
-// 			name := deepPath(realPath.Get(), info.Name())
-// 			lr.Name = name
-// 			lr.Path = filepath.Join(filepath.Dir(path), name)
-// 			lr.Type = filesystem.FILE_TYPE_DIR
-// 			lr.Size = handler.historyDirSize(string(realPath.Join(name)))
-// 		} else {
-// 			lr.Type = "file"
-// 			lr.Size = info.Size() // formatSize(info)
-// 		}
-// 		lrs = append(lrs, lr)
-// 	}
-
-// 	data, _ := json.Marshal(map[string]interface{}{
-// 		"files": lrs,
-// 		"auth":  auth,
-// 	})
-// 	w.Header().Set("Content-Type", "application/json")
-// 	w.Write(data)
-// }
-
 func (handler *FileServiceHandler) handleJsonList(w http.ResponseWriter, r *http.Request) {
 	requestPath := mux.Vars(r)["path"]
 	search := r.FormValue("search")
 	log.Printf("handleJsonList request path {%s}.\n", requestPath)
 
-	realPath, _ := handler.fileTransformer.TransformPath(requestPath)
+	realPath, err := handler.fileTransformer.TransformPath(requestPath)
+	if err != nil {
+		panic(err)
+	}
 
 	auth := handler.readAccessConf(realPath.Get())
-	auth.Upload = auth.canUpload(r)
-	auth.Delete = auth.canDelete(r)
+	// todo: 用户检查权限
+	// auth.Upload = auth.canUpload(r)
+	// auth.Delete = auth.canDelete(r)
 
 	var fileList []FileInfo
 
@@ -293,12 +220,10 @@ func (handler *FileServiceHandler) handleDelete(w http.ResponseWriter, req *http
 
 	// path = filepath.Clean(path) // for safe reason, prevent path contain ..
 	auth := handler.readAccessConf(realPath.Get())
-	if !auth.canDelete(req) {
+	if !auth.Delete {
 		http.Error(w, "Delete forbidden", http.StatusForbidden)
 		return
 	}
-
-	handler.fileTree.RmFile(realPath.Get())
 
 	// TODO: path safe check
 	err = os.RemoveAll(realPath.Get())
@@ -311,6 +236,7 @@ func (handler *FileServiceHandler) handleDelete(w http.ResponseWriter, req *http
 		}
 		return
 	}
+	handler.fileTree.RmFile(realPath.Get())
 	w.Write([]byte("Success"))
 }
 
@@ -322,7 +248,7 @@ func (handler *FileServiceHandler) handleUploadOrMkdir(w http.ResponseWriter, re
 
 	// check auth
 	auth := handler.readAccessConf(dirpath.Get())
-	if !auth.canUpload(req) {
+	if !auth.Upload {
 		http.Error(w, "Upload forbidden", http.StatusForbidden)
 		return
 	}
@@ -335,7 +261,7 @@ func (handler *FileServiceHandler) handleUploadOrMkdir(w http.ResponseWriter, re
 			http.Error(w, "Directory create "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		// handler.fileTree.AddDir(dirpath.Get())
+		handler.fileTree.AddDir(dirpath.Get())
 	}
 
 	if file == nil { // only mkdir

@@ -14,15 +14,15 @@ var (
 )
 
 type FileNode struct {
-	Path     string // abs, parent path
-	Size     int64  // file size or direction total size
-	FileInfo fs.FileInfo
-	Parent   *FileNode
-	SubFiles map[string]*FileNode
+	ParentPath string // abs, parent path
+	Size       int64  // file size or direction total size
+	FileInfo   fs.FileInfo
+	Parent     *FileNode
+	SubFiles   map[string]*FileNode
 }
 
 func (fn FileNode) GetName() string {
-	return fn.Path + "/" + fn.FileInfo.Name()
+	return fn.ParentPath + "/" + fn.FileInfo.Name()
 }
 
 func (fn FileNode) GetFileType() string {
@@ -47,18 +47,20 @@ func (fn *FileNode) addDir(path []string) {
 		return
 	}
 
-	fi := GetFileInfo(fn.Path + "/" + path[0])
+	fi := GetFileInfo(fn.GetName() + "/" + path[0])
 	if fi == nil {
 		panic("dir not exist.")
 	}
 
-	fn.SubFiles[path[0]] = &FileNode{
-		Path:     fn.Path,
-		FileInfo: fi,
-		SubFiles: map[string]*FileNode{},
+	if fn.SubFiles[path[0]] == nil {
+		fn.SubFiles[path[0]] = &FileNode{
+			ParentPath: fn.GetName(),
+			FileInfo:   fi,
+			SubFiles:   map[string]*FileNode{},
+		}
+		// append to cache
+		ftree.Files[path[0]] = append(ftree.Files[path[0]], fn.SubFiles[path[0]])
 	}
-	// append to cache
-	ftree.Files[path[0]] = append(ftree.Files[path[0]], fn.SubFiles[path[0]])
 
 	// 递归
 	fn.SubFiles[path[0]].addDir(path[1:])
@@ -67,19 +69,19 @@ func (fn *FileNode) addDir(path []string) {
 // 从根向子叶递归
 func (fn *FileNode) addFile(path []string, fileName string) int64 {
 	if len(path) == 0 {
-		finfo := GetFileInfo(fn.Path + "/" + fileName)
+		finfo := GetFileInfo(fn.GetName() + "/" + fileName)
 
 		// make file node
 		fnn := &FileNode{
-			Path:     fn.Path,
-			FileInfo: finfo,
-			Size:     finfo.Size(),
+			ParentPath: fn.GetName(),
+			FileInfo:   finfo,
+			Size:       finfo.Size(),
 		}
 
 		// add to cache
 		ftree.Files[fileName] = append(ftree.Files[fileName], fn)
 		// add to this dir
-		fn.SubFiles[fn.FileInfo.Name()] = fnn
+		fn.SubFiles[fileName] = fnn
 		fn.Size += fnn.Size
 		return fnn.Size
 	} else {
@@ -126,8 +128,8 @@ func CreateFileTree(localPath string) *FileTree {
 	tree := &FileTree{
 		Path: localPath,
 		Root: &FileNode{
-			Path:     filepath.Dir(localPath),
-			FileInfo: GetFileInfo(localPath),
+			ParentPath: filepath.Dir(localPath),
+			FileInfo:   GetFileInfo(localPath),
 		},
 		Files: make(map[string][]*FileNode),
 	}
@@ -151,9 +153,9 @@ func (fn *FileNode) walk() int64 {
 		// get sub dirs
 		for _, v := range getSubsFileList(fn.GetName()) {
 			sub_fn := &FileNode{
-				Path:     fn.GetName(),
-				FileInfo: v,
-				Parent:   fn,
+				ParentPath: fn.GetName(),
+				FileInfo:   v,
+				Parent:     fn,
 			}
 			fn.Size += sub_fn.walk()
 			fn.SubFiles[v.Name()] = sub_fn
@@ -170,7 +172,7 @@ func (ft *FileTree) AddDir(localPath string) {
 	ft.mutex.Lock()
 	defer ft.mutex.Unlock()
 
-	if Path(localPath).IsExist() {
+	if !Path(localPath).IsExist() {
 		log.Printf("file %s not exist", localPath)
 		return
 	}
@@ -196,7 +198,7 @@ func (ft *FileTree) AddFile(localFile string) {
 	ft.mutex.Lock()
 	defer ft.mutex.Unlock()
 
-	if Path(localFile).IsExist() {
+	if !Path(localFile).IsExist() {
 		log.Printf("file %s not exist", localFile)
 		return
 	}

@@ -111,7 +111,7 @@ func (ftf FileTransformer) TransformPath(path string) (Path, error) {
 
 	localPath := ftf.basicPath.Join(path)
 	if !localPath.IsExist() {
-		return "", errors.New("file not found")
+		return localPath, errors.New("file not found")
 	}
 
 	return localPath, nil

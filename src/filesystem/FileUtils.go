@@ -11,7 +11,7 @@ import (
 func GetFileInfo(fileName string) fs.FileInfo {
 	fi, err := os.Stat(fileName)
 	if err != nil {
-		log.Printf("%s\n", err)
+		log.Printf("get file info %s %s\n", fileName, err)
 		return nil
 	}
 	return fi
