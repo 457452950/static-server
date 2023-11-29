@@ -22,6 +22,7 @@ _testmain.go
 
 
 gohttpserver
+static-server
 bindata_assetfs.go
 assets_vfsdata.go
 *.un~
