@@ -76,6 +76,7 @@ type AppConfig struct {
 	Cors      bool              `json:"cors"`
 	XHeaders  bool              `json:"xheaders"`
 	Debug     bool              `json:"debug"`
+	MaxUpload float64           `json:"maxUploadFileSize"`
 	StSrvConf FileServiceConfig `json:"ss"`
 }
 
@@ -90,9 +91,10 @@ func GetDefaultConfig() (config AppConfig) {
 			Key:    "",
 			Port:   ConfigDefaultLocalTLSPort,
 		},
-		Cors:     false,
-		XHeaders: false,
-		Debug:    false,
+		Cors:      false,
+		XHeaders:  false,
+		Debug:     false,
+		MaxUpload: ConfigMaxUploadFilesize,
 		StSrvConf: FileServiceConfig{
 			Root:            ConfigDefaultRootDir,
 			Prefix:          ConfigDefaultPrefix,

@@ -64,6 +64,7 @@ var vm = new Vue({
       type: "dir",
     }],
     myDropzone: null,
+    maxFilesize: 15 * 1024,
   },
   computed: {
     computedFiles: function () {
@@ -124,22 +125,40 @@ var vm = new Vue({
         }
       }.bind(this)
     })
-    this.myDropzone = new Dropzone("#upload-form", {
-      paramName: "file",
-      maxFilesize: 25 * 1024,
-      addRemoveLinks: true,
-      init: function () {
-        this.on("uploadprogress", function (file, progress) {
-          // console.log("File progress", progress);
-        });
-        this.on("complete", function (file) {
-          console.log("reload file list")
-          loadFileList()
-        })
-      }
-    });
+    // this.myDropzone = new Dropzone("#upload-form", {
+    //   paramName: "file",
+    //   maxFilesize: 25 * 1024,
+    //   addRemoveLinks: true,
+    //   init: function () {
+    //     this.on("uploadprogress", function (file, progress) {
+    //       // console.log("File progress", progress);
+    //     });
+    //     this.on("complete", function (file) {
+    //       console.log("reload file list")
+    //       loadFileList()
+    //     })
+    //   }
+    // });
   },
   methods: {
+    gebUpload: function () {
+      console.log("gebUpload", this.maxFilesize)
+      
+      this.myDropzone = new Dropzone("#upload-form", {
+        paramName: "file",
+        maxFilesize: this.maxFilesize,
+        addRemoveLinks: true,
+        init: function () {
+          this.on("uploadprogress", function (file, progress) {
+            // console.log("File progress", progress);
+          });
+          this.on("complete", function (file) {
+            console.log("reload file list")
+            loadFileList()
+          })
+        }
+      });
+    },
     getEncodePath: function (filepath) {
       return pathJoin([location.pathname].concat(filepath.split("/").map(v => encodeURIComponent(v))))
     },
@@ -422,7 +441,7 @@ Vue.filter('formatBytes', function (value) {
   else if (bytes < 2**10) return bytes + " B";
   else if (bytes < 2**20) return (bytes / 2**10).toFixed(0) + " KB";
   else if (bytes < 2**30) return (bytes / 2**20).toFixed(1) + " MB";
-  else return (bytes / 2**40).toFixed(1) + " GB";
+  else return (bytes / 2**30).toFixed(1) + " GB";
 })
 
 $(function () {
@@ -436,6 +455,7 @@ $(function () {
   // update version
   $.getJSON("/-/sysinfo", function (res) {
     vm.version = res.version;
+    vm.maxFilesize = res.maxFileSize == null ? vm.makeFilesize : res.maxFileSize
   })
 
   var clipboard = new Clipboard('.btn');

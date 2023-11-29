@@ -21,6 +21,9 @@ type Service struct {
 }
 
 func CreateServer(conf config.AppConfig) (srv *Service) {
+	// init sysinfo config
+	MaxUploadFilesize = int64(conf.MaxUpload * 1024)
+
 	srv = &Service{
 		appConfig: conf,
 	}

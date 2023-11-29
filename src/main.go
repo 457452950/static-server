@@ -8,14 +8,9 @@ import (
 )
 
 var (
-	// defaultPlistProxy = "https://plistproxy.herokuapp.com/plist"
-	// defaultOpenID     = "https://login.netease.com/openid"
-	// gcfg              = Configure{}
-
-	VERSION   = "unknown"
-	BUILDTIME = "unknown time"
-	GITCOMMIT = "unknown git commit"
-	SITE      = "https://github.com/457452950/static-server"
+// defaultPlistProxy = "https://plistproxy.herokuapp.com/plist"
+// defaultOpenID     = "https://login.netease.com/openid"
+// gcfg              = Configure{}
 )
 
 // func parseFlags() error {
@@ -50,21 +45,6 @@ var (
 // 	kingpin.Flag("plistproxy", "plist proxy when server is not https").Short('p').StringVar(&gcfg.PlistProxy)
 // 	kingpin.Flag("title", "server title").StringVar(&gcfg.Title)
 // 	kingpin.Flag("google-tracker-id", "set to empty to disable it").StringVar(&gcfg.GoogleTrackerID)
-
-// 	kingpin.Parse() // first parse conf
-
-// 	if gcfg.Conf != nil {
-// 		defer func() {
-// 			kingpin.Parse() // command line priority high than conf
-// 		}()
-// 		ymlData, err := ioutil.ReadAll(gcfg.Conf)
-// 		if err != nil {
-// 			return err
-// 		}
-// 		return yaml.Unmarshal(ymlData, &gcfg)
-// 	}
-// 	return nil
-// }
 
 func main() {
 	// init log seting

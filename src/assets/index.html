@@ -108,7 +108,7 @@
                 <button class="btn btn-xs btn-default" v-on:click='toggleHidden()'>
                   Hidden <i class="fa" v-bind:class='showHidden ? "fa-eye" : "fa-eye-slash"'></i>
                 </button>
-                <button class="btn btn-xs btn-default" v-show="auth.upload" data-toggle="modal" data-target="#upload-modal">
+                <button class="btn btn-xs btn-default" v-show="auth.upload" data-toggle="modal" data-target="#upload-modal"  @click="gebUpload">
                   Upload <i class="fa fa-upload"></i>
                 </button>
                 <button class="btn btn-xs btn-default" v-show="auth.delete" @click="makeDirectory">

@@ -11,6 +11,8 @@
     "cors" : false,
     "xheaders" : false,
     "debug" : true,
+    "maxUploadFileSize" : 25,
+    "maxUploadFileSize_type_notuse" : "gb",
     "ss" : {
         "root" : "../",
         "prefix" : "/abc",
