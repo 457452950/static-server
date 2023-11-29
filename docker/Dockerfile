@@ -9,8 +9,8 @@ RUN mkdir -p /app/public
 RUN apt-get update && apt-get install -y ca-certificates
 VOLUME /app/public
 ADD assets ./assets
-#COPY --from=0 /app/gohttpserver/gohttpserver .
-COPY gohttpserver .
-EXPOSE 8000
-ENTRYPOINT [ "/app/gohttpserver", "--root=/app/public", "--upload", "--delete" ]
+# COPY --from=0 /app/gohttpserver/gohttpserver .
+COPY static-server .
+# EXPOSE 8000
+ENTRYPOINT [ "/app/static-server" ]
 CMD []

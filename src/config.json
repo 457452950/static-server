@@ -1,12 +1,12 @@
 {
     "host" : "",
-    "port" : 8000,
+    "port" : 8003,
     "httpauth" : "",
     "ssl" : {
         "enable" : true,
         "cert" : "cacert.pem",
         "key" : "privkey.pem",
-        "port" : 8001
+        "port" : 8004
     },
     "cors" : false,
     "xheaders" : false,
