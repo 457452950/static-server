@@ -197,7 +197,7 @@ var vm = new Vue({
     },
     genQrcode: function (name, title) {
       var urlPath = this.genInstallURL(name, true);
-      $("#qrcode-title").html(title || name || location.pathname);
+      $("#qrcode-title").html(decodeURIComponent(title || name || location.pathname));
       $("#qrcode-link").attr("href", urlPath);
       $('#qrcodeCanvas').empty().qrcode({
         text: encodeURI(urlPath),
